@@ -1,13 +1,8 @@
-const express = require('express');
-const cors = require('cors');
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-app.get('/', (req, res) => {
-    res.send('Backend Kanban da chay thanh cong!');
-});
+const app = require("./src/app");
+require("./src/config/db");
 
 const PORT = 5000;
-app.listen(PORT, () => console.log(`Server dang chay tren cong ${PORT}`));
+
+app.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+});
