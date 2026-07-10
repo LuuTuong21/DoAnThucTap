@@ -107,3 +107,21 @@ UNLOCK TABLES;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2026-07-08 10:25:07
+
+INSERT INTO users (username, password)
+VALUES
+('admin', '$2b$10$examplehash'),
+('bao', '$2b$10$examplehash'),
+('user1', '$2b$10$examplehash');
+
+INSERT INTO boards (board_name)
+VALUES
+('Công việc'),
+('Học tập'),
+('Cá nhân');
+
+INSERT INTO tasks (task_name, status, board_id)
+VALUES
+('Làm báo cáo', 'TODO', 1),
+('Code Backend', 'IN_PROGRESS', 1),
+('Học NodeJS', 'DONE', 2);
