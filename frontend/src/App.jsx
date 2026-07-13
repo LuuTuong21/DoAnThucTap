@@ -40,6 +40,36 @@ function App() {
     ]
   });
 
+  const handleAddTask = (newTask) => {
+    setBoardData((prevData) => ({
+      ...prevData,
+      "To Do": [...prevData["To Do"], newTask]
+    }));
+  };
+
+  // Hàm di chuyển Task giữa các cột
+  const handleMoveTask = (taskId, currentStatus, newStatus) => {
+    if (currentStatus === newStatus) return; // Nếu chọn lại cột cũ thì không làm gì cả
+
+    setBoardData((prevData) => {
+      // 1. Tìm thẻ task đang cần di chuyển
+      const taskToMove = prevData[currentStatus].find(t => t.task_id === taskId);
+      
+      // 2. Tạo mảng mới cho cột cũ (đã xóa thẻ đó đi)
+      const updatedCurrentColumn = prevData[currentStatus].filter(t => t.task_id !== taskId);
+      
+      // 3. Tạo mảng mới cho cột đích (đã thêm thẻ đó vào cuối)
+      const updatedNewColumn = [...prevData[newStatus], taskToMove];
+
+      // 4. Trả về cục dữ liệu mới
+      return {
+        ...prevData,
+        [currentStatus]: updatedCurrentColumn,
+        [newStatus]: updatedNewColumn
+      };
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-8 font-sans">
       <div className="max-w-7xl mx-auto">
@@ -78,8 +108,14 @@ function App() {
               {/* Danh sách Thẻ TaskCard */}
               <div className="flex flex-col gap-3 overflow-y-auto pb-2 flex-1">
                 {boardData[statusName].map((task) => (
-                  <TaskCard key={task.task_id} task={task} />
-                ))}
+                  <TaskCard 
+                    key={task.task_id} 
+                    task={task} 
+                    currentStatus={statusName} // Truyền tên cột hiện tại
+                    allStatuses={Object.keys(boardData)} // Truyền danh sách 3 cột để làm menu
+                    onMoveTask={handleMoveTask} // Truyền hàm di chuyển
+                  />
+                  ))}
               </div>
               
             </div>
@@ -92,7 +128,8 @@ function App() {
       {/* Component Modal */}
       <TaskModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        onClose={() => setIsModalOpen(false)}
+        onAddTask={handleAddTask}
       />
 
     </div>
