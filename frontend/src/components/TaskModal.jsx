@@ -1,38 +1,61 @@
 import React, { useState } from 'react';
 
-// Thêm prop onAddTask để truyền dữ liệu ngược lên App.jsx
 function TaskModal({ isOpen, onClose, onAddTask }) {
-  // Tạo state để lưu trữ giá trị của các ô input
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState('');
+  
+  const [errors, setErrors] = useState({});
 
   if (!isOpen) return null;
 
-  // Hàm xử lý khi người dùng bấm nút "Lưu công việc"
   const handleSubmit = (e) => {
-    e.preventDefault(); // Ngăn chặn hành vi load lại trang mặc định của form
+    e.preventDefault(); 
     
+    const newErrors = {};
+
+    // Logic Validation 1: Check rỗng cho Tiêu đề
     if (!title.trim()) {
-      alert("Vui lòng nhập tiêu đề công việc!");
-      return;
+      newErrors.title = "Tiêu đề công việc không được để trống.";
     }
 
-    // Đóng gói dữ liệu thành một object chuẩn
+    // Logic Validation 2: Check rỗng VÀ check quá khứ cho Hạn chót
+    if (!deadline) {
+      // Báo lỗi nếu người dùng bỏ trống
+      newErrors.deadline = "Chưa thêm thời gian.";
+    } else {
+      const selectedDate = new Date(deadline);
+      const currentDate = new Date();
+      
+      // Nếu có thời gian nhưng lại nằm trong quá khứ -> Báo lỗi
+      if (selectedDate < currentDate) {
+        newErrors.deadline = "Hạn chót không được nằm trong quá khứ.";
+      }
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors); 
+      return; 
+    }
+
     const newTask = {
-      task_id: Math.floor(Math.random() * 10000), // Random tạm 1 ID tĩnh
+      task_id: Math.floor(Math.random() * 10000), 
       title: title,
       description: description,
-      deadline: deadline || "Chưa có hạn"
+      deadline: deadline // Bây giờ chắc chắn đã có dữ liệu nên không cần || nữa
     };
 
-    // Truyền gói dữ liệu này ra ngoài cho App.jsx xử lý
     onAddTask(newTask);
 
-    // Xóa trắng form và đóng Modal
     setTitle('');
     setDescription('');
     setDeadline('');
+    setErrors({});
+    onClose();
+  };
+
+  const handleCancel = () => {
+    setErrors({});
     onClose();
   };
 
@@ -43,18 +66,25 @@ function TaskModal({ isOpen, onClose, onAddTask }) {
           Thêm công việc mới
         </h2>
         
-        {/* Lắng nghe sự kiện onSubmit của Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề công việc <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tiêu đề công việc <span className="text-red-500">*</span>
+            </label>
             <input 
               type="text" 
               value={title}
-              onChange={(e) => setTitle(e.target.value)} // Cập nhật state liên tục khi gõ
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (errors.title) setErrors({...errors, title: ''});
+              }} 
               placeholder="Vd: Thiết kế Database..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 transition-shadow ${
+                errors.title ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+              }`}
             />
+            {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
           </div>
 
           <div>
@@ -69,25 +99,34 @@ function TaskModal({ isOpen, onClose, onAddTask }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Hạn chót</label>
+            {/* Thêm dấu * đỏ để báo hiệu đây là trường bắt buộc */}
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Hạn chót <span className="text-red-500">*</span>
+            </label>
             <input 
               type="datetime-local" 
               value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+              onChange={(e) => {
+                setDeadline(e.target.value);
+                if (errors.deadline) setErrors({...errors, deadline: ''});
+              }}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 transition-shadow ${
+                errors.deadline ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+              }`}
             />
+            {errors.deadline && <p className="text-red-500 text-xs mt-1">{errors.deadline}</p>}
           </div>
 
           <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
             <button 
               type="button" 
-              onClick={onClose}
+              onClick={handleCancel}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-all"
             >
               Hủy bỏ
             </button>
             <button 
-              type="submit" // Đổi type thành submit để kích hoạt hàm handleSubmit
+              type="submit" 
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-all shadow-sm"
             >
               Lưu công việc
