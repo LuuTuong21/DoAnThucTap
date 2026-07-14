@@ -208,3 +208,39 @@ exports.updateTask = (req, res) => {
     });
 
 };
+// DELETE /api/tasks/:id
+exports.deleteTask = (req, res) => {
+
+    const { id } = req.params;
+
+
+    Task.deleteTask(id, (err, results) => {
+
+        if (err) {
+            console.error("Lỗi xóa task:", err);
+
+            return res.status(500).json({
+                success: false,
+                message: "Lỗi database"
+            });
+        }
+
+
+        if (results.affectedRows === 0) {
+
+            return res.status(404).json({
+                success: false,
+                message: "Không tìm thấy task"
+            });
+
+        }
+
+
+        res.json({
+            success: true,
+            message: "Xóa task thành công!"
+        });
+
+    });
+
+};

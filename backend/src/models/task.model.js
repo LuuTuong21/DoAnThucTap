@@ -84,6 +84,21 @@ const Task = {
             callback
         );
 
+    },
+
+
+    // Delete task
+    deleteTask: (id, callback) => {
+
+        const sql = "DELETE FROM task WHERE task_id = ?";
+
+
+        db.query(
+            sql,
+            [id],
+            callback
+        );
+
     }
 
 };
