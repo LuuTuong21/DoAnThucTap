@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import toast, { Toaster } from 'react-hot-toast'; // Import thư viện thông báo
+import toast, { Toaster } from 'react-hot-toast';
 import TaskCard from './components/TaskCard';
 import TaskModal from './components/TaskModal';
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false); 
-  
-  // State mới để quản lý trạng thái đang tải dữ liệu
   const [isLoading, setIsLoading] = useState(false);
 
   const [boardData, setBoardData] = useState({
@@ -16,24 +14,28 @@ function App() {
     "Done": []
   });
 
-  // HÀM 1: GỌI API LẤY DANH SÁCH (GET)
-  const fetchTasks = async () => {
-    setIsLoading(true); // Bật hiệu ứng loading
+  // 1. API LẤY DANH SÁCH (GET)
+const fetchTasks = async () => {
+    setIsLoading(true); 
     try {
-      // (Nhắc BE cung cấp đúng link này cho bạn)
-      const response = await axios.get('http://localhost:5000/api/tasks'); 
-      const taskData = response.data.data; 
+      const response = await axios.get('http://26.76.97.99:5000/api/tasks'); 
+      
+      // Lúc này response.data.data là một MẢNG chứa TẤT CẢ công việc
+      const allTasks = response.data.data; 
 
+      // FRONTEND TỰ RA TAY PHÂN LOẠI DỮ LIỆU:
       setBoardData({
-        "To Do": taskData.todo,
-        "In progress": taskData.inProgress,
-        "Done": taskData.done
+        "To Do": allTasks.filter(task => task.status === "To Do"),
+        // Lưu ý: BE đang trả về chữ "In Progress" (chữ P viết hoa)
+        "In progress": allTasks.filter(task => task.status === "In Progress" || task.status === "In progress"),
+        "Done": allTasks.filter(task => task.status === "Done")
       });
+
     } catch (error) {
       console.error("Lỗi Fetch:", error);
-      toast.error("Không thể kết nối đến máy chủ!"); // Bật thông báo lỗi
+      toast.error("Không thể kết nối đến máy chủ!"); 
     } finally {
-      setIsLoading(false); // Tắt hiệu ứng loading dù thành công hay thất bại
+      setIsLoading(false); 
     }
   };
 
@@ -41,21 +43,25 @@ function App() {
     fetchTasks();
   }, []);
 
-  // HÀM 2: GỌI API TẠO TASK MỚI (POST)
+  // 2. API TẠO TASK MỚI (POST)
   const handleAddTask = async (newTask) => {
-    // Lưu ý: Tạm thời xóa task_id do FE sinh ra, để Database tự động tạo ID chuẩn (Auto Increment)
-    const { task_id, ...taskDataToSubmit } = newTask;
-
-    // Hiển thị trạng thái đang xử lý trên thông báo
+    const { task_id, ...taskData } = newTask; // Bỏ ID ảo do FE tự tạo
     const toastId = toast.loading("Đang lưu công việc...");
 
+    // Đóng gói dữ liệu chuẩn theo yêu cầu của BE
+    const payloadToSubmit = {
+      ...taskData,
+      status: "To Do", 
+      board_id: 1      
+    };
+
     try {
-      // Gửi dữ liệu xuống Backend
-      await axios.post('http://localhost:5000/api/tasks', taskDataToSubmit);
+      // Gắn link POST /api/tasks
+      await axios.post('http://26.76.97.99:5000/api/tasks', payloadToSubmit);
       
-      // Báo thành công và tải lại danh sách mới nhất từ DB
       toast.success("Thêm công việc thành công!", { id: toastId });
-      fetchTasks(); 
+      setIsModalOpen(false); // Đóng modal khi thêm thành công
+      fetchTasks(); // Tải lại danh sách
       
     } catch (error) {
       console.error("Lỗi POST:", error);
@@ -63,27 +69,56 @@ function App() {
     }
   };
 
-  // Hàm handleMoveTask tạm thời giữ nguyên logic UI (Sẽ cắm API Đổi cột vào Ngày 11)
-  const handleMoveTask = (taskId, currentStatus, newStatus) => {
+  // 3. API CẬP NHẬT TRẠNG THÁI TASK (PUT)
+  const handleMoveTask = async (taskId, currentStatus, newStatus) => {
     if (currentStatus === newStatus) return; 
 
-    setBoardData((prevData) => {
-      const taskToMove = prevData[currentStatus].find(t => t.task_id === taskId);
-      const updatedCurrentColumn = prevData[currentStatus].filter(t => t.task_id !== taskId);
-      const updatedNewColumn = [...prevData[newStatus], taskToMove];
+    // Tìm dữ liệu cũ để gửi kèm theo yêu cầu của BE
+    const fullTask = boardData[currentStatus].find(t => t.task_id === taskId);
+    if (!fullTask) return;
 
-      return {
-        ...prevData,
-        [currentStatus]: updatedCurrentColumn,
-        [newStatus]: updatedNewColumn
-      };
-    });
+    const toastId = toast.loading("Đang luân chuyển công việc...");
+
+    try {
+      // Gắn link PUT /api/tasks/:id
+      await axios.put(`http://26.76.97.99:5000/api/tasks/${taskId}`, {
+        title: fullTask.title,
+        description: fullTask.description,
+        deadline: fullTask.deadline,
+        status: newStatus 
+      });
+
+      toast.success(`Đã chuyển sang ${newStatus}!`, { id: toastId });
+      fetchTasks(); 
+      
+    } catch (error) {
+      console.error("Lỗi UPDATE:", error);
+      toast.error("Chuyển cột thất bại, vui lòng thử lại!", { id: toastId });
+    }
+  };
+
+  // 4. API XÓA TASK (DELETE)
+  const handleDeleteTask = async (taskId) => {
+    const confirmDelete = window.confirm("Bạn có chắc chắn muốn xóa công việc này không?");
+    if (!confirmDelete) return;
+
+    const toastId = toast.loading("Đang xóa công việc...");
+
+    try {
+      // Gắn link DELETE /api/tasks/:id
+      await axios.delete(`http://26.76.97.99:5000/api/tasks/${taskId}`);
+      
+      toast.success("Đã xóa thành công!", { id: toastId });
+      fetchTasks(); 
+      
+    } catch (error) {
+      console.error("Lỗi DELETE:", error);
+      toast.error("Xóa thất bại, vui lòng thử lại!", { id: toastId });
+    }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-8 font-sans relative">
-      
-      {/* Khởi tạo bộ máy phát thông báo của react-hot-toast */}
       <Toaster position="top-right" reverseOrder={false} />
 
       <div className="max-w-7xl mx-auto">
@@ -99,7 +134,6 @@ function App() {
           </button>
         </header>
         
-        {/* HIỂN THỊ LOADING KHI ĐANG FETCH API */}
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -112,19 +146,20 @@ function App() {
                   <h2 className="font-bold text-sm text-gray-700 uppercase tracking-wide">
                     {statusName} 
                     <span className="ml-2 bg-gray-300 text-gray-700 py-0.5 px-2 rounded-full text-xs">
-                      {boardData[statusName].length}
+                      {boardData[statusName]?.length || 0}
                     </span>
                   </h2>
                 </div>
                 
                 <div className="flex flex-col gap-3 overflow-y-auto pb-2 flex-1">
-                  {boardData[statusName].map((task) => (
+                  {boardData[statusName]?.map((task) => (
                     <TaskCard 
                       key={task.task_id} 
                       task={task} 
                       currentStatus={statusName} 
                       allStatuses={Object.keys(boardData)} 
                       onMoveTask={handleMoveTask} 
+                      onDeleteTask={handleDeleteTask}
                     />
                   ))}
                 </div>
@@ -132,7 +167,6 @@ function App() {
             ))}
           </div>
         )}
-
       </div>
 
       <TaskModal 
