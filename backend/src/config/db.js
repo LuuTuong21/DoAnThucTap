@@ -1,10 +1,15 @@
+require("dotenv").config();
 const mysql = require("mysql2");
 
 const connection = mysql.createConnection({
-    host: "localhost",
-    user: "root",
-    password: "TuQuocBao147204@",
-    database: "task_manager"
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    ssl: {
+        minVersion: "TLSv1.2"
+    }
 });
 
 connection.connect((err) => {
@@ -14,7 +19,7 @@ connection.connect((err) => {
         return;
     }
 
-    console.log("MySQL Connected!");
+    console.log("TiDB Connected!");
 });
 
 module.exports = connection;
