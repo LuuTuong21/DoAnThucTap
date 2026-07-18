@@ -18,7 +18,7 @@ function App() {
 const fetchTasks = async () => {
     setIsLoading(true); 
     try {
-      const response = await axios.get('http://26.76.97.99:5000/api/tasks'); 
+      const response = await axios.get('https://kaban-api-backend-ro81.onrender.com/api/tasks'); 
       
       // Lúc này response.data.data là một MẢNG chứa TẤT CẢ công việc
       const allTasks = response.data.data; 
@@ -57,7 +57,7 @@ const fetchTasks = async () => {
 
     try {
       // Gắn link POST /api/tasks
-      await axios.post('http://26.76.97.99:5000/api/tasks', payloadToSubmit);
+      await axios.post('https://kaban-api-backend-ro81.onrender.com/api/tasks', payloadToSubmit);
       
       toast.success("Thêm công việc thành công!", { id: toastId });
       setIsModalOpen(false); // Đóng modal khi thêm thành công
@@ -81,7 +81,7 @@ const fetchTasks = async () => {
 
     try {
       // Gắn link PUT /api/tasks/:id
-      await axios.put(`http://26.76.97.99:5000/api/tasks/${taskId}`, {
+      await axios.put(`https://kaban-api-backend-ro81.onrender.com/api/tasks/${taskId}`, {
         title: fullTask.title,
         description: fullTask.description,
         deadline: fullTask.deadline,
@@ -106,7 +106,7 @@ const fetchTasks = async () => {
 
     try {
       // Gắn link DELETE /api/tasks/:id
-      await axios.delete(`http://26.76.97.99:5000/api/tasks/${taskId}`);
+      await axios.delete(`https://kaban-api-backend-ro81.onrender.com/api/tasks/${taskId}`);
       
       toast.success("Đã xóa thành công!", { id: toastId });
       fetchTasks(); 
