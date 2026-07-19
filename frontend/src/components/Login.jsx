@@ -1,33 +1,30 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios'; // BẮT BUỘC THÊM DÒNG NÀY ĐỂ GỌI API
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => { // Lưu ý: phải có chữ async ở đây
     e.preventDefault();
 
-    // --- PHẦN GIẢ LẬP (MOCK) ---
-    if (email && password) {
-      localStorage.setItem('token', 'day_la_token_gia_mao_de_test_frontend');
-      alert('Đăng nhập giả lập thành công!');
-      navigate('/');
-    } else {
-      alert('Vui lòng nhập email và mật khẩu!');
-    }
-    // ---------------------------
-
-    /* CODE THẬT (MỞ RA KHI BE LÀM XONG):
     try {
+      // Gọi API đăng nhập tới Backend thật của bạn
       const res = await axios.post('https://kaban-api-backend-ro81.onrender.com/api/auth/login', { email, password });
+      
+      // 1. Cất Token vào két sắt (localStorage)
       localStorage.setItem('token', res.data.token);
+      
+      // 2. Thông báo thành công
+      alert("Đăng nhập thành công!");
+
+      // 3. Chuyển hướng người dùng về trang chủ (Kanban Board)
       navigate('/');
     } catch (error) {
       alert(error.response?.data?.message || 'Sai thông tin đăng nhập');
     }
-    */
   };
 
   return (
@@ -40,7 +37,7 @@ const Login = () => {
           fontSize: '32px',          
           fontWeight: '900',         
           marginBottom: '30px',      
-          background: 'linear-gradient(90deg, #10b981, #059669)', // Gradient Xanh Ngọc
+          background: 'linear-gradient(90deg, #10b981, #059669)', 
           WebkitBackgroundClip: 'text',       
           WebkitTextFillColor: 'transparent', 
           textTransform: 'uppercase',         
@@ -90,7 +87,7 @@ const Login = () => {
 
           <button type="submit" style={{ 
             padding: '12px', 
-            backgroundColor: '#10b981', // Nút màu xanh ngọc
+            backgroundColor: '#10b981', 
             color: 'white', 
             border: 'none', 
             cursor: 'pointer', 

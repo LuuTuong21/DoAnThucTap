@@ -9,17 +9,6 @@ const Register = () => {
   const handleRegister = (e) => {
     e.preventDefault();
     
-    // --- PHẦN GIẢ LẬP (MOCK) ---
-    if (email && password) {
-      alert('Đăng ký giả lập thành công! Mời bạn đăng nhập.');
-      // Chuyển hướng sang trang đăng nhập
-      navigate('/login');
-    } else {
-      alert('Vui lòng nhập đầy đủ thông tin!');
-    }
-    // ---------------------------
-
-    /* CODE THẬT (MỞ RA KHI BE LÀM XONG):
     try {
       await axios.post('https://kaban-api-backend-ro81.onrender.com/api/auth/register', { email, password });
       alert('Đăng ký thành công!');
@@ -27,7 +16,6 @@ const Register = () => {
     } catch (error) {
       alert(error.response?.data?.message || 'Lỗi đăng ký');
     }
-    */
   };
 
   return (
