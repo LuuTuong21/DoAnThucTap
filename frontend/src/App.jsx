@@ -1,12 +1,26 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 import TaskCard from './components/TaskCard';
 import TaskModal from './components/TaskModal';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import Login from './components/Login';
+import Register from './components/Register';
 
-function App() {
+// --- 1. COMPONENT BẢO VỆ: KỂM TRA XEM CÓ THẺ TOKEN CHƯA ---
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
+
+// --- 2. BẢNG KANBAN CHÍNH (ĐƯỢC ĐỔI TÊN TỪ APP -> KANBANBOARD) ---
+function KanbanBoard() {
   const [isModalOpen, setIsModalOpen] = useState(false); 
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate(); // Dùng để chuyển trang khi Đăng xuất
 
   const [boardData, setBoardData] = useState({
     "To Do": [],
@@ -14,26 +28,35 @@ function App() {
     "Done": []
   });
 
+  // HÀM LẤY THẺ TOKEN TỪ KÉT SẮT
+  const getAuthConfig = () => {
+    const token = localStorage.getItem('token');
+    return { headers: { Authorization: `Bearer ${token}` } };
+  };
+
   // 1. API LẤY DANH SÁCH (GET)
-const fetchTasks = async () => {
+  const fetchTasks = async () => {
     setIsLoading(true); 
     try {
-      const response = await axios.get('https://kaban-api-backend-ro81.onrender.com/api/tasks'); 
+      // Đã kẹp thẻ token vào getAuthConfig()
+      const response = await axios.get('https://kaban-api-backend-ro81.onrender.com/api/tasks', getAuthConfig()); 
       
-      // Lúc này response.data.data là một MẢNG chứa TẤT CẢ công việc
       const allTasks = response.data.data; 
 
-      // FRONTEND TỰ RA TAY PHÂN LOẠI DỮ LIỆU:
       setBoardData({
         "To Do": allTasks.filter(task => task.status === "To Do"),
-        // Lưu ý: BE đang trả về chữ "In Progress" (chữ P viết hoa)
         "In progress": allTasks.filter(task => task.status === "In Progress" || task.status === "In progress"),
         "Done": allTasks.filter(task => task.status === "Done")
       });
 
     } catch (error) {
       console.error("Lỗi Fetch:", error);
-      toast.error("Không thể kết nối đến máy chủ!"); 
+      if (error.response?.status === 401) {
+        toast.error("Phiên đăng nhập hết hạn!");
+        navigate('/login');
+      } else {
+        toast.error("Không thể kết nối đến máy chủ!"); 
+      }
     } finally {
       setIsLoading(false); 
     }
@@ -45,10 +68,9 @@ const fetchTasks = async () => {
 
   // 2. API TẠO TASK MỚI (POST)
   const handleAddTask = async (newTask) => {
-    const { task_id, ...taskData } = newTask; // Bỏ ID ảo do FE tự tạo
+    const { task_id, ...taskData } = newTask;
     const toastId = toast.loading("Đang lưu công việc...");
 
-    // Đóng gói dữ liệu chuẩn theo yêu cầu của BE
     const payloadToSubmit = {
       ...taskData,
       status: "To Do", 
@@ -56,12 +78,12 @@ const fetchTasks = async () => {
     };
 
     try {
-      // Gắn link POST /api/tasks
-      await axios.post('https://kaban-api-backend-ro81.onrender.com/api/tasks', payloadToSubmit);
+      // Đã kẹp thẻ token vào getAuthConfig()
+      await axios.post('https://kaban-api-backend-ro81.onrender.com/api/tasks', payloadToSubmit, getAuthConfig());
       
       toast.success("Thêm công việc thành công!", { id: toastId });
-      setIsModalOpen(false); // Đóng modal khi thêm thành công
-      fetchTasks(); // Tải lại danh sách
+      setIsModalOpen(false); 
+      fetchTasks(); 
       
     } catch (error) {
       console.error("Lỗi POST:", error);
@@ -73,20 +95,19 @@ const fetchTasks = async () => {
   const handleMoveTask = async (taskId, currentStatus, newStatus) => {
     if (currentStatus === newStatus) return; 
 
-    // Tìm dữ liệu cũ để gửi kèm theo yêu cầu của BE
     const fullTask = boardData[currentStatus].find(t => t.task_id === taskId);
     if (!fullTask) return;
 
     const toastId = toast.loading("Đang luân chuyển công việc...");
 
     try {
-      // Gắn link PUT /api/tasks/:id
+      // Đã kẹp thẻ token vào getAuthConfig()
       await axios.put(`https://kaban-api-backend-ro81.onrender.com/api/tasks/${taskId}`, {
         title: fullTask.title,
         description: fullTask.description,
         deadline: fullTask.deadline,
         status: newStatus 
-      });
+      }, getAuthConfig());
 
       toast.success(`Đã chuyển sang ${newStatus}!`, { id: toastId });
       fetchTasks(); 
@@ -105,8 +126,8 @@ const fetchTasks = async () => {
     const toastId = toast.loading("Đang xóa công việc...");
 
     try {
-      // Gắn link DELETE /api/tasks/:id
-      await axios.delete(`https://kaban-api-backend-ro81.onrender.com/api/tasks/${taskId}`);
+      // Đã kẹp thẻ token vào getAuthConfig()
+      await axios.delete(`https://kaban-api-backend-ro81.onrender.com/api/tasks/${taskId}`, getAuthConfig());
       
       toast.success("Đã xóa thành công!", { id: toastId });
       fetchTasks(); 
@@ -117,21 +138,36 @@ const fetchTasks = async () => {
     }
   };
 
+  // HÀM ĐĂNG XUẤT
+  const handleLogout = () => {
+    localStorage.removeItem('token'); // Ném thẻ token đi
+    toast.success("Đã đăng xuất!");
+    navigate('/login'); // Đá văng ra màn hình đăng nhập
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-8 font-sans relative">
+    <div className="min-h-screen bg-green-50 p-8 font-sans relative">
       <Toaster position="top-right" reverseOrder={false} />
 
       <div className="max-w-7xl mx-auto">
         <header className="mb-10 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-800">
+          <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-linear-to-r from-emerald-500 to-teal-600 uppercase tracking-wider drop-shadow-sm">
             Bảng Kanban Dự Án
           </h1>
-          <button 
-            onClick={() => setIsModalOpen(true)} 
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium shadow-sm transition-colors"
-          >
-            + Thêm công việc
-          </button>
+          <div className="flex gap-4">
+            <button 
+              onClick={() => setIsModalOpen(true)} 
+              className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-md font-medium shadow-sm transition-colors"
+            >
+              + Thêm công việc
+            </button>
+            <button 
+              onClick={handleLogout} 
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md font-medium shadow-sm transition-colors"
+            >
+              Đăng Xuất
+            </button>
+          </div>
         </header>
         
         {isLoading ? (
@@ -175,6 +211,28 @@ const fetchTasks = async () => {
         onAddTask={handleAddTask} 
       />
     </div>
+  );
+}
+
+// --- 3. COMPONENT APP GỐC: KHỞI TẠO CÁC ĐƯỜNG DẪN (ROUTER) ---
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        
+        {/* Đường dẫn trang chủ (Bảng Kanban) được bọc bởi lớp bảo vệ */}
+        <Route 
+          path="/" 
+          element={
+            <ProtectedRoute>
+              <KanbanBoard />
+            </ProtectedRoute>
+          } 
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
