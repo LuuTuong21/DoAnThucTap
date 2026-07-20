@@ -41,12 +41,14 @@ function TaskCard({ task, currentStatus, allStatuses, onMoveTask, onDeleteTask }
         </button>
       </div>
 
-      <h3 className="font-semibold text-gray-800 text-sm mb-2 group-hover:text-blue-600 transition-colors pr-24">
+      {/* Đã thêm break-all để bẻ cong tiêu đề nếu chữ dính liền quá dài */}
+      <h3 className="font-semibold text-gray-800 text-sm mb-2 group-hover:text-blue-600 transition-colors pr-24 break-all">
         {task.title}
       </h3>
       
       {task.description && (
-        <p className="text-xs text-gray-600 mb-3 line-clamp-2">
+        // Đã xóa line-clamp-2, thêm break-all và whitespace-normal để văn bản rớt xuống dòng và hiện đầy đủ
+        <p className="text-xs text-gray-600 mb-3 break-all whitespace-normal">
           {task.description}
         </p>
       )}
