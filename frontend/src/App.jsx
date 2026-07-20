@@ -216,6 +216,7 @@ function KanbanBoard() {
 
 // --- 3. COMPONENT APP GỐC: KHỞI TẠO CÁC ĐƯỜNG DẪN (ROUTER) ---
 function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   return (
     <BrowserRouter>
       <Routes>
