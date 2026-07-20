@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 function TaskModal({ isOpen, onClose, onAddTask }) {
   const [title, setTitle] = useState('');
@@ -6,6 +6,16 @@ function TaskModal({ isOpen, onClose, onAddTask }) {
   const [deadline, setDeadline] = useState('');
   
   const [errors, setErrors] = useState({});
+
+  // Reset lại form mỗi khi Modal bị ẩn đi (Đảm bảo form luôn sạch sẽ khi mở lại)
+  useEffect(() => {
+    if (!isOpen) {
+      setTitle('');
+      setDescription('');
+      setDeadline('');
+      setErrors({});
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -21,7 +31,6 @@ function TaskModal({ isOpen, onClose, onAddTask }) {
 
     // Logic Validation 2: Check rỗng VÀ check quá khứ cho Hạn chót
     if (!deadline) {
-      // Báo lỗi nếu người dùng bỏ trống
       newErrors.deadline = "Chưa thêm thời gian.";
     } else {
       const selectedDate = new Date(deadline);
@@ -42,20 +51,15 @@ function TaskModal({ isOpen, onClose, onAddTask }) {
       task_id: Math.floor(Math.random() * 10000), 
       title: title,
       description: description,
-      deadline: deadline // Bây giờ chắc chắn đã có dữ liệu nên không cần || nữa
+      deadline: deadline 
     };
 
     onAddTask(newTask);
-
-    setTitle('');
-    setDescription('');
-    setDeadline('');
-    setErrors({});
     onClose();
+    // Không cần reset tay ở đây nữa vì useEffect ở trên sẽ tự động dọn dẹp khi isOpen = false
   };
 
   const handleCancel = () => {
-    setErrors({});
     onClose();
   };
 
@@ -81,7 +85,7 @@ function TaskModal({ isOpen, onClose, onAddTask }) {
               }} 
               placeholder="Vd: Thiết kế Database..."
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 transition-shadow ${
-                errors.title ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                errors.title ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
               }`}
             />
             {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
@@ -94,12 +98,11 @@ function TaskModal({ isOpen, onClose, onAddTask }) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Nhập chi tiết công việc cần làm..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-shadow"
             ></textarea>
           </div>
 
           <div>
-            {/* Thêm dấu * đỏ để báo hiệu đây là trường bắt buộc */}
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Hạn chót <span className="text-red-500">*</span>
             </label>
@@ -111,7 +114,7 @@ function TaskModal({ isOpen, onClose, onAddTask }) {
                 if (errors.deadline) setErrors({...errors, deadline: ''});
               }}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 transition-shadow ${
-                errors.deadline ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                errors.deadline ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-emerald-500'
               }`}
             />
             {errors.deadline && <p className="text-red-500 text-xs mt-1">{errors.deadline}</p>}
@@ -121,13 +124,13 @@ function TaskModal({ isOpen, onClose, onAddTask }) {
             <button 
               type="button" 
               onClick={handleCancel}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-all"
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-all cursor-pointer"
             >
               Hủy bỏ
             </button>
             <button 
               type="submit" 
-              className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2 rounded-lg font-bold shadow-md shadow-emerald-500/30 transition-all duration-300"
+              className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2 rounded-lg font-bold shadow-md shadow-emerald-500/30 transition-all duration-300 cursor-pointer"
             >
               Lưu công việc
             </button>
