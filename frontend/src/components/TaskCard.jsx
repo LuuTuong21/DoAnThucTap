@@ -59,10 +59,6 @@ function TaskCard({ task, currentStatus, allStatuses, onMoveTask, onDeleteTask }
           {/* GỌI HÀM FORMAT TẠI ĐÂY */}
           {formatDeadline(task.deadline)}
         </div>
-        
-        <span className="px-2 py-1 text-[10px] font-semibold bg-gray-100 text-gray-500 rounded-full">
-          ID: {task.task_id}
-        </span>
       </div>
     </div>
   );
