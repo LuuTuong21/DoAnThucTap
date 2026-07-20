@@ -219,7 +219,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
         <Route path="/register" element={<Register />} />
         
         {/* Đường dẫn trang chủ (Bảng Kanban) được bọc bởi lớp bảo vệ */}
