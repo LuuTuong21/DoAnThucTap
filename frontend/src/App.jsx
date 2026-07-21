@@ -39,8 +39,8 @@ function KanbanBoard() {
   const fetchTasks = async () => {
     setIsLoading(true); 
     try {
-      // Đã kẹp thẻ token vào getAuthConfig()
-      const response = await axios.get('https://kaban-api-backend-ro81.onrender.com/api/tasks', getAuthConfig()); 
+      // Đã thêm ?project_id=null để chỉ lấy công việc cá nhân
+      const response = await axios.get('https://kaban-api-backend-ro81.onrender.com/api/tasks?project_id=null', getAuthConfig()); 
       
       const allTasks = response.data.data; 
 
@@ -79,7 +79,6 @@ function KanbanBoard() {
     };
 
     try {
-      // Đã kẹp thẻ token vào getAuthConfig()
       await axios.post('https://kaban-api-backend-ro81.onrender.com/api/tasks', payloadToSubmit, getAuthConfig());
       
       toast.success("Thêm công việc thành công!", { id: toastId });
@@ -102,11 +101,12 @@ function KanbanBoard() {
     const toastId = toast.loading("Đang luân chuyển công việc...");
 
     try {
-      // Đã kẹp thẻ token vào getAuthConfig()
+      // Đã bổ sung priority để giữ nguyên mức độ ưu tiên khi kéo thả
       await axios.put(`https://kaban-api-backend-ro81.onrender.com/api/tasks/${taskId}`, {
         title: fullTask.title,
         description: fullTask.description,
         deadline: fullTask.deadline,
+        priority: fullTask.priority, 
         status: newStatus 
       }, getAuthConfig());
 
@@ -127,7 +127,6 @@ function KanbanBoard() {
     const toastId = toast.loading("Đang xóa công việc...");
 
     try {
-      // Đã kẹp thẻ token vào getAuthConfig()
       await axios.delete(`https://kaban-api-backend-ro81.onrender.com/api/tasks/${taskId}`, getAuthConfig());
       
       toast.success("Đã xóa thành công!", { id: toastId });
@@ -146,20 +145,20 @@ function KanbanBoard() {
 
       <div className="max-w-7xl mx-auto">
         <header className="mb-10 flex justify-between items-center">
-        {/* Sẵn tiện đổi tên cho hợp với kiến trúc mới */}
-      <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-linear-to-r from-emerald-500 to-teal-600 uppercase tracking-wider drop-shadow-sm">
-        Công việc cá nhân
-      </h1>
+          <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-linear-to-r from-emerald-500 to-teal-600 uppercase tracking-wider drop-shadow-sm">
+            Công việc cá nhân
+          </h1>
   
-      <div className="flex gap-4">
-        <button 
-          onClick={() => setIsModalOpen(true)} 
-          className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-md font-medium shadow-sm transition-colors"
-        >
-        + Thêm công việc
-      </button>
-  </div>
-</header>
+          <div className="flex gap-4">
+            <button 
+              onClick={() => setIsModalOpen(true)} 
+              className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-md font-medium shadow-sm transition-colors"
+            >
+              + Thêm công việc
+            </button>
+          </div>
+        </header>
+
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>

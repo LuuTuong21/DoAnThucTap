@@ -13,10 +13,16 @@ const Login = ({ setIsLoggedIn }) => {
     e.preventDefault();
 
     try {
+      // Sử dụng đúng link API Backend đã deploy
       const res = await axios.post('https://kaban-api-backend-ro81.onrender.com/api/auth/login', { email, password });
       
+      // Lưu chìa khóa Token vào bộ nhớ trình duyệt
       localStorage.setItem('token', res.data.token);
       setIsLoggedIn(true);
+      
+      alert("Đăng nhập thành công!");
+      
+      // Chuyển hướng về trang chủ (Bảng Kanban)
       navigate('/');
     } catch (error) {
       alert(error.response?.data?.message || 'Lỗi đăng nhập. Sai email hoặc mật khẩu.');
@@ -45,7 +51,7 @@ const Login = ({ setIsLoggedIn }) => {
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
-          {/* Ô nhập Email giữ nguyên */}
+          {/* Ô nhập Email */}
           <input 
             type="email" 
             placeholder="Ví dụ: Someone@gmail.com" 
@@ -65,7 +71,7 @@ const Login = ({ setIsLoggedIn }) => {
             }}
           />
 
-          {/* Ô NHẬP MẬT KHẨU MỚI (Đã tích hợp nút Hiện/Ẩn) */}
+          {/* Ô nhập Mật khẩu (Có nút Ẩn/Hiện) */}
           <div style={{ position: 'relative', width: '100%' }}>
             <input 
               type={showPassword ? "text" : "password"} 
@@ -79,7 +85,7 @@ const Login = ({ setIsLoggedIn }) => {
               required 
               style={{ 
                 width: '100%',
-                padding: '12px 45px 12px 15px', // Chừa khoảng trống bên phải
+                padding: '12px 45px 12px 15px',
                 fontSize: '16px', 
                 border: '1.5px solid #d1d5db', 
                 borderRadius: '8px',
@@ -108,13 +114,11 @@ const Login = ({ setIsLoggedIn }) => {
               title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
             >
               {showPassword ? (
-                // Icon Mắt nhắm (Ẩn)
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
                   <line x1="1" y1="1" x2="23" y2="23"></line>
                 </svg>
               ) : (
-                // Icon Mắt mở (Hiện)
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                   <circle cx="12" cy="12" r="3"></circle>
@@ -123,7 +127,6 @@ const Login = ({ setIsLoggedIn }) => {
             </button>
           </div>
 
-          {/* Nút Đăng nhập */}
           <button type="submit" style={{ 
             padding: '12px', 
             background: 'linear-gradient(90deg, #10b981, #059669)',

@@ -4,15 +4,18 @@ function TaskModal({ isOpen, onClose, onAddTask }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState('');
+  // Bổ sung State cho Priority, mặc định là Medium
+  const [priority, setPriority] = useState('Medium'); 
   
   const [errors, setErrors] = useState({});
 
-  // Reset lại form mỗi khi Modal bị ẩn đi (Đảm bảo form luôn sạch sẽ khi mở lại)
+  // Reset lại form mỗi khi Modal bị ẩn đi
   useEffect(() => {
     if (!isOpen) {
       setTitle('');
       setDescription('');
       setDeadline('');
+      setPriority('Medium'); // Nhớ reset cả priority
       setErrors({});
     }
   }, [isOpen]);
@@ -51,12 +54,12 @@ function TaskModal({ isOpen, onClose, onAddTask }) {
       task_id: Math.floor(Math.random() * 10000), 
       title: title,
       description: description,
-      deadline: deadline 
+      deadline: deadline,
+      priority: priority // Đẩy priority vào gói dữ liệu gửi ra ngoài
     };
 
     onAddTask(newTask);
     onClose();
-    // Không cần reset tay ở đây nữa vì useEffect ở trên sẽ tự động dọn dẹp khi isOpen = false
   };
 
   const handleCancel = () => {
@@ -100,6 +103,20 @@ function TaskModal({ isOpen, onClose, onAddTask }) {
               placeholder="Nhập chi tiết công việc cần làm..."
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-shadow"
             ></textarea>
+          </div>
+
+          {/* Bổ sung Ô chọn Mức độ ưu tiên (Priority) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mức độ ưu tiên</label>
+            <select 
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-shadow bg-white"
+            >
+              <option value="Low">Thấp (Low)</option>
+              <option value="Medium">Trung bình (Medium)</option>
+              <option value="High">Cao (High)</option>
+            </select>
           </div>
 
           <div>
