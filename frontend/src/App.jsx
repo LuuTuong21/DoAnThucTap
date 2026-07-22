@@ -7,6 +7,8 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import Login from './components/Login';
 import Register from './components/Register';
 import Layout from './components/Layout';
+import ProjectList from './components/ProjectList';
+import ProjectDetail from "./components/ProjectDetail";
 
 // --- 1. COMPONENT BẢO VỆ: KỂM TRA XEM CÓ THẺ TOKEN CHƯA ---
 const ProtectedRoute = ({ children }) => {
@@ -212,23 +214,33 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/projects/:projectId" element={<ProjectDetail />} />
         
-        {/* Đường dẫn trang chủ - Bây giờ đã có Layout bọc ngoài Bảng Kanban */}
-        <Route 
-          path="/" 
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <KanbanBoard />
-              </Layout>
-            </ProtectedRoute>
-          } 
-        />
-        
-        {/* Chuẩn bị sẵn đường dẫn cho Ngày 16 (Quản lý Project) - Hiện tại cứ để comment */}
-        {/* <Route path="/projects" element={<ProtectedRoute><Layout><ProjectList /></Layout></ProtectedRoute>} /> */}
+      {/* 1. ĐƯỜNG DẪN TRANG CHỦ (Bảng Kanban cá nhân) - Bạn vừa lỡ tay xóa mất đoạn này */}
+      <Route 
+        path="/" 
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <KanbanBoard />
+            </Layout>
+          </ProtectedRoute>
+        } 
+      />
+  
+      {/* 2. ĐƯỜNG DẪN TRANG DỰ ÁN NHÓM (Mới thêm cho Ngày 16) */}
+      <Route 
+        path="/projects" 
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ProjectList />
+            </Layout>
+          </ProtectedRoute>
+        } 
+      />
 
-      </Routes>
+</Routes>
     </BrowserRouter>
   );
 }
