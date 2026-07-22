@@ -20,7 +20,12 @@ function ProjectDetail() {
   const [assignedTo, setAssignedTo] = useState(''); 
   const [taskDeadline, setTaskDeadline] = useState('');
 
-  // State hỗ trợ tìm kiếm thành viên theo email
+  // State cho Modal thêm thành viên
+  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
+  const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState('Member');
+
+  // State hỗ trợ tìm kiếm thành viên theo tên hoặc email
   const [memberSearch, setMemberSearch] = useState('');
   const [isMemberDropdownOpen, setIsMemberDropdownOpen] = useState(false);
 
@@ -88,6 +93,31 @@ function ProjectDetail() {
     }
   };
 
+  // Hàm xử lý thêm thành viên vào dự án
+  const handleAddMember = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}/members`, {
+        email: newMemberEmail,
+        role: newMemberRole
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        alert("Thêm thành viên thành công!");
+        setIsMemberModalOpen(false);
+        setNewMemberEmail('');
+        setNewMemberRole('Member');
+        fetchProjectData();
+      }
+    } catch (err) {
+      console.error("Lỗi thêm thành viên:", err);
+      alert(err.response?.data?.message || "Không thể thêm thành viên!");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen text-emerald-600 font-semibold text-lg">
@@ -115,15 +145,16 @@ function ProjectDetail() {
   const inProgressTasks = tasks.filter(t => t.status === 'In progress' || t.status === 'in_progress');
   const doneTasks = tasks.filter(t => t.status === 'Done' || t.status === 'done');
 
-  // Hàm lấy email người thực hiện dựa vào user_id
-  const getAssigneeEmail = (userId) => {
+  // Hàm lấy tên người thực hiện dựa vào user_id
+  const getAssigneeName = (userId) => {
     const member = members.find(m => m.user_id === userId);
-    return member ? member.email : 'Chưa phân công';
+    return member ? (member.name || member.email) : 'Chưa phân công';
   };
 
-  // Lọc danh sách thành viên theo email
+  // Lọc danh sách thành viên theo tên hoặc email
   const filteredMembers = members.filter(m => 
-    m.email && m.email.toLowerCase().includes(memberSearch.toLowerCase())
+    (m.name && m.name.toLowerCase().includes(memberSearch.toLowerCase())) ||
+    (m.email && m.email.toLowerCase().includes(memberSearch.toLowerCase()))
   );
 
   const selectedMember = members.find(m => m.user_id === assignedTo);
@@ -145,12 +176,20 @@ function ProjectDetail() {
           <p className="text-sm text-gray-500">{project?.description || "Không có mô tả"}</p>
         </div>
         
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold shadow-md shadow-emerald-500/30 transition-all cursor-pointer"
-        >
-          + Thêm Task mới
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => setIsMemberModalOpen(true)}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all cursor-pointer"
+          >
+            + Thêm thành viên
+          </button>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold shadow-md shadow-emerald-500/30 transition-all cursor-pointer"
+          >
+            + Thêm Task mới
+          </button>
+        </div>
       </div>
 
       {/* Bảng Kanban 3 cột */}
@@ -176,7 +215,7 @@ function ProjectDetail() {
                   </div>
                   <p className="text-xs text-gray-500 mb-2">{task.description}</p>
                   <div className="flex justify-between items-center text-[10px] text-gray-400 border-t pt-2 mt-2">
-                    <span>✉️ {getAssigneeEmail(task.assigned_to)}</span>
+                    <span>👤 {getAssigneeName(task.assigned_to)}</span>
                     {task.deadline && <span>Hạn: {new Date(task.deadline).toLocaleDateString()}</span>}
                   </div>
                 </div>
@@ -205,7 +244,7 @@ function ProjectDetail() {
                   </div>
                   <p className="text-xs text-gray-500 mb-2">{task.description}</p>
                   <div className="flex justify-between items-center text-[10px] text-gray-400 border-t pt-2 mt-2">
-                    <span>✉️ {getAssigneeEmail(task.assigned_to)}</span>
+                    <span>👤 {getAssigneeName(task.assigned_to)}</span>
                     {task.deadline && <span>Hạn: {new Date(task.deadline).toLocaleDateString()}</span>}
                   </div>
                 </div>
@@ -232,7 +271,7 @@ function ProjectDetail() {
                   </div>
                   <p className="text-xs text-gray-500 mb-2">{task.description}</p>
                   <div className="flex justify-between items-center text-[10px] text-gray-400 border-t pt-2 mt-2">
-                    <span>✉️ {getAssigneeEmail(task.assigned_to)}</span>
+                    <span>👤 {getAssigneeName(task.assigned_to)}</span>
                     {task.deadline && <span>Hạn: {new Date(task.deadline).toLocaleDateString()}</span>}
                   </div>
                 </div>
@@ -290,15 +329,15 @@ function ProjectDetail() {
                   </select>
                 </div>
 
-                {/* Phần tìm kiếm và chọn người thực hiện bằng email */}
+                {/* Phần tìm kiếm và chọn người thực hiện bằng tên hoặc email */}
                 <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Người thực hiện <span className="text-red-500">*</span>
                   </label>
                   <input 
                     type="text"
-                    placeholder="Gõ email thành viên..."
-                    value={isMemberDropdownOpen ? memberSearch : (selectedMember ? selectedMember.email : '')}
+                    placeholder="Gõ tên hoặc email..."
+                    value={isMemberDropdownOpen ? memberSearch : (selectedMember ? (selectedMember.name || selectedMember.email) : '')}
                     onFocus={() => {
                       setIsMemberDropdownOpen(true);
                       setMemberSearch('');
@@ -313,7 +352,7 @@ function ProjectDetail() {
                   {isMemberDropdownOpen && (
                     <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
                       {filteredMembers.length === 0 ? (
-                        <div className="p-2 text-xs text-gray-500 text-center">Không tìm thấy email phù hợp</div>
+                        <div className="p-2 text-xs text-gray-500 text-center">Không tìm thấy kết quả phù hợp</div>
                       ) : (
                         filteredMembers.map(member => (
                           <div 
@@ -323,10 +362,11 @@ function ProjectDetail() {
                               setMemberSearch('');
                               setIsMemberDropdownOpen(false);
                             }}
-                            className="px-3 py-2 text-xs hover:bg-emerald-50 cursor-pointer flex flex-col border-b border-gray-50 last:border-none"
+                            className="px-3 py-2 text-xs hover:bg-emerald-50 cursor-pointer flex flex-col gap-0.5 border-b border-gray-50 last:border-none"
                           >
-                            <span className="font-semibold text-gray-800">{member.email}</span>
-                            <span className="text-gray-400">Vai trò: {member.role}</span>
+                            <span className="font-semibold text-gray-800">{member.name || "Chưa đặt tên"}</span>
+                            <span className="text-gray-500 text-[11px]">{member.email}</span>
+                            <span className="text-gray-400 text-[10px]">Vai trò: {member.role}</span>
                           </div>
                         ))
                       )}
@@ -361,6 +401,58 @@ function ProjectDetail() {
                   className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium shadow-md shadow-emerald-500/20 cursor-pointer"
                 >
                   Tạo task
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Thêm Thành Viên */}
+      {isMemberModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
+          <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Thêm thành viên vào dự án</h2>
+            <form onSubmit={handleAddMember} className="flex flex-col gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email thành viên <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  type="email" 
+                  required
+                  value={newMemberEmail} 
+                  onChange={(e) => setNewMemberEmail(e.target.value)} 
+                  placeholder="Nhập email tài khoản..."
+                  className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Vai trò</label>
+                <select 
+                  value={newMemberRole} 
+                  onChange={(e) => setNewMemberRole(e.target.value)}
+                  className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500"
+                >
+                  <option value="Member">Member</option>
+                  <option value="Leader">Leader</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setIsMemberModalOpen(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium shadow-md shadow-blue-500/20 cursor-pointer"
+                >
+                  Thêm thành viên
                 </button>
               </div>
             </form>

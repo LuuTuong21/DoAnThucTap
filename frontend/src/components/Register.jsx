@@ -3,10 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 
 const Register = () => {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
-  // Thêm state showPassword ở đúng vị trí bên trong component
   const [showPassword, setShowPassword] = useState(false);
   
   const navigate = useNavigate();
@@ -15,11 +14,11 @@ const Register = () => {
     e.preventDefault();
 
     try {
-      await axios.post('https://kaban-api-backend-ro81.onrender.com/api/auth/register', { email, password });
+      await axios.post('https://kaban-api-backend-ro81.onrender.com/api/auth/register', { name, email, password });
       alert("Đăng ký thành công! Vui lòng đăng nhập.");
       navigate('/login');
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi đăng ký. Có thể email đã tồn tại.');
+      alert(error.response?.data?.message || 'Lỗi đăng ký. Vui lòng thử lại.');
     }
   };
 
@@ -28,22 +27,41 @@ const Register = () => {
       
       <div style={{ width: '100%', maxWidth: '420px', backgroundColor: 'white', padding: '40px 30px', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.1)' }}>
         
-        {/* Tiêu đề áp dụng Gradient */}
         <h2 style={{ 
           textAlign: 'center', 
           fontSize: '32px',          
           fontWeight: '900',         
           marginBottom: '30px',      
           background: 'linear-gradient(90deg, #10b981, #059669)', 
-          WebkitBackgroundClip: 'text',       
+          WebkitBackgroundClip: 'text',      
           WebkitTextFillColor: 'transparent', 
-          textTransform: 'uppercase',         
-          letterSpacing: '1px'                
+          textTransform: 'uppercase',        
+          letterSpacing: '1px'               
         }}>
           ĐĂNG KÝ
         </h2>
 
         <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Ô nhập Họ và tên */}
+          <input 
+            type="text" 
+            placeholder="Họ và tên (Ví dụ: Nguyễn Văn A)" 
+            value={name} 
+            onChange={(e) => {
+              setName(e.target.value);
+              e.target.setCustomValidity(''); 
+            }} 
+            onInvalid={(e) => e.target.setCustomValidity('Vui lòng không để trống họ và tên')}
+            required 
+            style={{ 
+              padding: '12px 15px', 
+              fontSize: '16px', 
+              border: '1.5px solid #d1d5db', 
+              borderRadius: '8px',
+              outline: 'none'
+            }}
+          />
+
           <input 
             type="email" 
             placeholder="Ví dụ: Someone@gmail.com" 
@@ -63,7 +81,7 @@ const Register = () => {
             }}
           />
 
-          {/* Ô NHẬP MẬT KHẨU MỚI (Đã tích hợp nút Hiện/Ẩn) */}
+          {/* Ô NHẬP MẬT KHẨU (Đã tích hợp nút Hiện/Ẩn) */}
           <div style={{ position: 'relative', width: '100%' }}>
             <input 
               type={showPassword ? "text" : "password"} 
@@ -77,7 +95,7 @@ const Register = () => {
               required 
               style={{ 
                 width: '100%',
-                padding: '12px 45px 12px 15px', // Chừa khoảng trống bên phải
+                padding: '12px 45px 12px 15px',
                 fontSize: '16px', 
                 border: '1.5px solid #d1d5db', 
                 borderRadius: '8px',
@@ -106,13 +124,11 @@ const Register = () => {
               title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
             >
               {showPassword ? (
-                // Icon Mắt nhắm (Ẩn)
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
                   <line x1="1" y1="1" x2="23" y2="23"></line>
                 </svg>
               ) : (
-                // Icon Mắt mở (Hiện)
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                   <circle cx="12" cy="12" r="3"></circle>
@@ -123,7 +139,7 @@ const Register = () => {
 
           <button type="submit" style={{ 
             padding: '12px', 
-            background: 'linear-gradient(90deg, #10b981, #059669)', // Nút cũng dùng Gradient
+            background: 'linear-gradient(90deg, #10b981, #059669)', 
             color: 'white', 
             border: 'none', 
             cursor: 'pointer', 
