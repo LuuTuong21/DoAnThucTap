@@ -12,11 +12,13 @@ function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // State cho Modal thêm Task
+  // State cho Modal Tạo / Sửa Task
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState(null); // null = tạo mới, object = đang sửa
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDesc, setTaskDesc] = useState('');
   const [taskPriority, setTaskPriority] = useState('Medium');
+  const [taskStatus, setTaskStatus] = useState('To Do');
   const [assignedTo, setAssignedTo] = useState(''); 
   const [taskDeadline, setTaskDeadline] = useState('');
 
@@ -41,7 +43,7 @@ function ProjectDetail() {
         setProject(response.data.project);
         setTasks(response.data.tasks || []);
         setMembers(response.data.members || []);
-        if (response.data.members && response.data.members.length > 0) {
+        if (response.data.members && response.data.members.length > 0 && !assignedTo) {
           setAssignedTo(response.data.members[0].user_id);
         }
       }
@@ -57,43 +59,96 @@ function ProjectDetail() {
     fetchProjectData();
   }, [projectId]);
 
-  // Hàm xử lý tạo Task mới
-  const handleCreateTask = async (e) => {
+  // Mở modal tạo task mới
+  const openCreateModal = () => {
+    setEditingTask(null);
+    setTaskTitle('');
+    setTaskDesc('');
+    setTaskPriority('Medium');
+    setTaskStatus('To Do');
+    setTaskDeadline('');
+    setMemberSearch('');
+    if (members.length > 0) setAssignedTo(members[0].user_id);
+    setIsModalOpen(true);
+  };
+
+  // Mở modal sửa task
+  const openEditModal = (task) => {
+    setEditingTask(task);
+    setTaskTitle(task.title);
+    setTaskDesc(task.description || '');
+    setTaskPriority(task.priority || 'Medium');
+    setTaskStatus(task.status || 'To Do');
+    setAssignedTo(task.assigned_to);
+    
+    // Chuyển deadline về định dạng YYYY-MM-THH:mm cho input datetime-local
+    if (task.deadline) {
+      const d = new Date(task.deadline);
+      const formatted = d.toISOString().slice(0, 16);
+      setTaskDeadline(formatted);
+    } else {
+      setTaskDeadline('');
+    }
+
+    setIsModalOpen(true);
+  };
+
+  // Hàm xử lý lưu Task (Tạo mới hoặc Cập nhật)
+  const handleSaveTask = async (e) => {
     e.preventDefault();
     if (!assignedTo) {
       alert("Vui lòng chọn người thực hiện công việc!");
       return;
     }
 
+    const payload = {
+      title: taskTitle,
+      description: taskDesc,
+      priority: taskPriority,
+      status: taskStatus,
+      assigned_to: assignedTo,
+      deadline: taskDeadline || null
+    };
+
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}/tasks`, {
-        title: taskTitle,
-        description: taskDesc,
-        priority: taskPriority,
-        status: 'To Do', 
-        assigned_to: assignedTo,
-        deadline: taskDeadline || null
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (response.data.success) {
-        setIsModalOpen(false);
-        setTaskTitle('');
-        setTaskDesc('');
-        setTaskPriority('Medium');
-        setTaskDeadline('');
-        setMemberSearch('');
-        fetchProjectData();
+      if (editingTask) {
+        // Gọi API Cập nhật Task
+        await axios.put(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}/tasks/${editingTask.task_id}`, payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        // Gọi API Tạo Task mới
+        await axios.post(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}/tasks`, payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
       }
+
+      setIsModalOpen(false);
+      fetchProjectData();
     } catch (err) {
-      console.error("Lỗi tạo task:", err);
-      alert(err.response?.data?.message || "Không thể tạo công việc mới!");
+      console.error("Lỗi lưu task:", err);
+      alert(err.response?.data?.message || "Không thể lưu công việc!");
     }
   };
 
-  // Hàm thay đổi trạng thái task trực tiếp
+  // Hàm xử lý Xóa Task
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa công việc này?")) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}/tasks/${taskId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchProjectData();
+    } catch (err) {
+      console.error("Lỗi xóa task:", err);
+      alert("Không thể xóa công việc này!");
+    }
+  };
+
+  // Hàm thay đổi trạng thái task trực tiếp từ dropdown
   const handleStatusChange = async (task, newStatus) => {
     try {
       const token = localStorage.getItem('token');
@@ -107,7 +162,7 @@ function ProjectDetail() {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      fetchProjectData(); // Load lại dữ liệu sau khi đổi trạng thái
+      fetchProjectData();
     } catch (err) {
       console.error("Lỗi đổi trạng thái task:", err);
       alert("Không thể cập nhật trạng thái công việc!");
@@ -180,6 +235,47 @@ function ProjectDetail() {
 
   const selectedMember = members.find(m => m.user_id === assignedTo);
 
+  // Render chung cho từng thẻ Task Card
+  const renderTaskCard = (task) => (
+    <div key={task.task_id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow flex flex-col gap-2">
+      <div className="flex justify-between items-start gap-2">
+        <h4 className={`font-semibold text-gray-800 text-sm ${task.status === 'Done' || task.status === 'done' ? 'line-through opacity-75' : ''}`}>
+          {task.title}
+        </h4>
+        <div className="flex items-center gap-1 shrink-0">
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${task.priority === 'High' ? 'bg-red-100 text-red-600' : task.priority === 'Medium' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>
+            {task.priority}
+          </span>
+          <button onClick={() => openEditModal(task)} title="Sửa công việc" className="text-gray-400 hover:text-blue-600 p-1 cursor-pointer">
+            ✏️
+          </button>
+          <button onClick={() => handleDeleteTask(task.task_id)} title="Xóa công việc" className="text-gray-400 hover:text-red-600 p-1 cursor-pointer">
+            🗑️
+          </button>
+        </div>
+      </div>
+
+      <p className="text-xs text-gray-500 whitespace-pre-line">{task.description}</p>
+      
+      <div className="flex justify-between items-center text-[10px] text-gray-400 border-t pt-2 mt-1">
+        <span>👤 {getAssigneeName(task.assigned_to)}</span>
+        {task.deadline && <span>🕒 {new Date(task.deadline).toLocaleString()}</span>}
+      </div>
+
+      <div className="flex justify-end mt-1">
+        <select 
+          value={task.status} 
+          onChange={(e) => handleStatusChange(task, e.target.value)}
+          className="text-[11px] bg-gray-50 border border-gray-300 rounded px-2 py-1 font-medium text-gray-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
+        >
+          <option value="To Do">To Do</option>
+          <option value="In progress">In progress</option>
+          <option value="Done">Done</option>
+        </select>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 p-6 flex flex-col">
       {/* Header trang chi tiết */}
@@ -205,7 +301,7 @@ function ProjectDetail() {
             + Thêm thành viên
           </button>
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={openCreateModal}
             className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold shadow-md shadow-emerald-500/30 transition-all cursor-pointer"
           >
             + Thêm Task mới
@@ -239,36 +335,7 @@ function ProjectDetail() {
             {todoTasks.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-6">Chưa có công việc nào</p>
             ) : (
-              todoTasks.map(task => (
-                <div key={task.task_id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow flex flex-col gap-2">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-semibold text-gray-800 text-sm">{task.title}</h4>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${task.priority === 'High' ? 'bg-red-100 text-red-600' : task.priority === 'Medium' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>
-                      {task.priority}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500">{task.description}</p>
-                  
-                  {/* Thanh công cụ phụ: Người thực hiện, hạn chót và đổi trạng thái */}
-                  <div className="flex justify-between items-center text-[10px] text-gray-400 border-t pt-2 mt-1">
-                    <span>👤 {getAssigneeName(task.assigned_to)}</span>
-                    {task.deadline && <span>🕒 {new Date(task.deadline).toLocaleString()}</span>}
-                  </div>
-
-                  {/* Dropdown chuyển đổi trạng thái nhanh */}
-                  <div className="flex justify-end mt-1">
-                    <select 
-                      value={task.status} 
-                      onChange={(e) => handleStatusChange(task, e.target.value)}
-                      className="text-[11px] bg-gray-50 border border-gray-300 rounded px-2 py-1 font-medium text-gray-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                    >
-                      <option value="To Do">To Do</option>
-                      <option value="In progress">In progress</option>
-                      <option value="Done">Done</option>
-                    </select>
-                  </div>
-                </div>
-              ))
+              todoTasks.map(renderTaskCard)
             )}
           </div>
         </div>
@@ -283,34 +350,7 @@ function ProjectDetail() {
             {inProgressTasks.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-6">Chưa có công việc nào</p>
             ) : (
-              inProgressTasks.map(task => (
-                <div key={task.task_id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow flex flex-col gap-2">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-semibold text-gray-800 text-sm">{task.title}</h4>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${task.priority === 'High' ? 'bg-red-100 text-red-600' : task.priority === 'Medium' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>
-                      {task.priority}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500">{task.description}</p>
-                  
-                  <div className="flex justify-between items-center text-[10px] text-gray-400 border-t pt-2 mt-1">
-                    <span>👤 {getAssigneeName(task.assigned_to)}</span>
-                    {task.deadline && <span>🕒 {new Date(task.deadline).toLocaleString()}</span>}
-                  </div>
-
-                  <div className="flex justify-end mt-1">
-                    <select 
-                      value={task.status} 
-                      onChange={(e) => handleStatusChange(task, e.target.value)}
-                      className="text-[11px] bg-gray-50 border border-gray-300 rounded px-2 py-1 font-medium text-gray-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                    >
-                      <option value="To Do">To Do</option>
-                      <option value="In progress">In progress</option>
-                      <option value="Done">Done</option>
-                    </select>
-                  </div>
-                </div>
-              ))
+              inProgressTasks.map(renderTaskCard)
             )}
           </div>
         </div>
@@ -325,44 +365,21 @@ function ProjectDetail() {
             {doneTasks.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-6">Chưa có công việc nào</p>
             ) : (
-              doneTasks.map(task => (
-                <div key={task.task_id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 opacity-90 hover:shadow-md transition-shadow flex flex-col gap-2">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-semibold text-gray-800 text-sm line-through">{task.title}</h4>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-600">{task.priority}</span>
-                  </div>
-                  <p className="text-xs text-gray-500">{task.description}</p>
-                  
-                  <div className="flex justify-between items-center text-[10px] text-gray-400 border-t pt-2 mt-1">
-                    <span>👤 {getAssigneeName(task.assigned_to)}</span>
-                    {task.deadline && <span>🕒 {new Date(task.deadline).toLocaleString()}</span>}
-                  </div>
-
-                  <div className="flex justify-end mt-1">
-                    <select 
-                      value={task.status} 
-                      onChange={(e) => handleStatusChange(task, e.target.value)}
-                      className="text-[11px] bg-gray-50 border border-gray-300 rounded px-2 py-1 font-medium text-gray-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
-                    >
-                      <option value="To Do">To Do</option>
-                      <option value="In progress">In progress</option>
-                      <option value="Done">Done</option>
-                    </select>
-                  </div>
-                </div>
-              ))
+              doneTasks.map(renderTaskCard)
             )}
           </div>
         </div>
 
       </div>
 
-      {/* Modal Thêm Task Mới */}
+      {/* Modal Tạo/Sửa Task */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-xl w-full max-w-md shadow-xl">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Tạo công việc mới</h2>
-            <form onSubmit={handleCreateTask} className="flex flex-col gap-4">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              {editingTask ? "Chỉnh sửa công việc" : "Tạo công việc mới"}
+            </h2>
+            <form onSubmit={handleSaveTask} className="flex flex-col gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Tiêu đề công việc <span className="text-red-500">*</span>
@@ -404,60 +421,70 @@ function ProjectDetail() {
                   </select>
                 </div>
 
-                {/* Phần tìm kiếm và chọn người thực hiện bằng tên hoặc email */}
-                <div className="relative">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Người thực hiện <span className="text-red-500">*</span>
-                  </label>
-                  <input 
-                    type="text"
-                    placeholder="Gõ tên hoặc email..."
-                    value={isMemberDropdownOpen ? memberSearch : (selectedMember ? (selectedMember.name || selectedMember.email) : '')}
-                    onFocus={() => {
-                      setIsMemberDropdownOpen(true);
-                      setMemberSearch('');
-                    }}
-                    onChange={(e) => {
-                      setMemberSearch(e.target.value);
-                      setIsMemberDropdownOpen(true);
-                    }}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+                  <select 
+                    value={taskStatus} 
+                    onChange={(e) => setTaskStatus(e.target.value)}
                     className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 text-sm"
-                  />
-                  
-                  {isMemberDropdownOpen && (
-                    <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                      {filteredMembers.length === 0 ? (
-                        <div className="p-2 text-xs text-gray-500 text-center">Không tìm thấy kết quả phù hợp</div>
-                      ) : (
-                        filteredMembers.map(member => (
-                          <div 
-                            key={member.user_id}
-                            onClick={() => {
-                              setAssignedTo(member.user_id);
-                              setMemberSearch('');
-                              setIsMemberDropdownOpen(false);
-                            }}
-                            className="px-3 py-2 text-xs hover:bg-emerald-50 cursor-pointer flex flex-col gap-0.5 border-b border-gray-50 last:border-none"
-                          >
-                            <span className="font-semibold text-gray-800">{member.name || "Chưa đặt tên"}</span>
-                            <span className="text-gray-500 text-[11px]">{member.email}</span>
-                            <span className="text-gray-400 text-[10px]">Vai trò: {member.role}</span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
+                  >
+                    <option value="To Do">To Do</option>
+                    <option value="In progress">In progress</option>
+                    <option value="Done">Done</option>
+                  </select>
                 </div>
               </div>
 
-              {/* Ô chọn Ngày và Giờ phút (datetime-local) */}
-              <div>
+              {/* Phần chọn người thực hiện */}
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Hạn chót (Deadline) <span className="text-red-500">*</span>
+                  Người thực hiện <span className="text-red-500">*</span>
                 </label>
                 <input 
+                  type="text"
+                  placeholder="Gõ tên hoặc email..."
+                  value={isMemberDropdownOpen ? memberSearch : (selectedMember ? (selectedMember.name || selectedMember.email) : '')}
+                  onFocus={() => {
+                    setIsMemberDropdownOpen(true);
+                    setMemberSearch('');
+                  }}
+                  onChange={(e) => {
+                    setMemberSearch(e.target.value);
+                    setIsMemberDropdownOpen(true);
+                  }}
+                  className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 text-sm"
+                />
+                
+                {isMemberDropdownOpen && (
+                  <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                    {filteredMembers.length === 0 ? (
+                      <div className="p-2 text-xs text-gray-500 text-center">Không tìm thấy kết quả phù hợp</div>
+                    ) : (
+                      filteredMembers.map(member => (
+                        <div 
+                          key={member.user_id}
+                          onClick={() => {
+                            setAssignedTo(member.user_id);
+                            setMemberSearch('');
+                            setIsMemberDropdownOpen(false);
+                          }}
+                          className="px-3 py-2 text-xs hover:bg-emerald-50 cursor-pointer flex flex-col gap-0.5 border-b border-gray-50 last:border-none"
+                        >
+                          <span className="font-semibold text-gray-800">{member.name || "Chưa đặt tên"}</span>
+                          <span className="text-gray-500 text-[11px]">{member.email}</span>
+                          <span className="text-gray-400 text-[10px]">Vai trò: {member.role}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Ô chọn Ngày và Giờ phút */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Hạn chót (Deadline)</label>
+                <input 
                   type="datetime-local" 
-                  required
                   value={taskDeadline} 
                   onChange={(e) => setTaskDeadline(e.target.value)} 
                   className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 text-sm"
@@ -476,7 +503,7 @@ function ProjectDetail() {
                   type="submit" 
                   className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium shadow-md shadow-emerald-500/20 cursor-pointer text-sm"
                 >
-                  Tạo task
+                  {editingTask ? "Cập nhật" : "Tạo task"}
                 </button>
               </div>
             </form>

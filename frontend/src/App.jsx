@@ -9,8 +9,9 @@ import Register from './components/Register';
 import Layout from './components/Layout';
 import ProjectList from './components/ProjectList';
 import ProjectDetail from "./components/ProjectDetail";
+import Settings from './components/Settings';
 
-// --- 1. COMPONENT BẢO VỆ: KỂM TRA XEM CÓ THẺ TOKEN CHƯA ---
+// --- 1. COMPONENT BẢO VỆ: KIỂM TRA XEM CÓ THẺ TOKEN CHƯA ---
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   if (!token) {
@@ -19,11 +20,12 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// --- 2. BẢNG KANBAN CHÍNH (ĐƯỢC ĐỔI TÊN TỪ APP -> KANBANBOARD) ---
+// --- 2. BẢNG KANBAN CHÍNH (CÔNG VIỆC CÁ NHÂN) ---
 function KanbanBoard() {
   const [isModalOpen, setIsModalOpen] = useState(false); 
+  const [taskToEdit, setTaskToEdit] = useState(null); // State quản lý task đang được sửa
   const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate(); // Dùng để chuyển trang khi Đăng xuất
+  const navigate = useNavigate();
 
   const [boardData, setBoardData] = useState({
     "To Do": [],
@@ -31,7 +33,7 @@ function KanbanBoard() {
     "Done": []
   });
 
-  // HÀM LẤY THẺ TOKEN TỪ KÉT SẮT
+  // HÀM LẤY THẺ TOKEN TỪ STORAGE
   const getAuthConfig = () => {
     const token = localStorage.getItem('token');
     return { headers: { Authorization: `Bearer ${token}` } };
@@ -41,15 +43,14 @@ function KanbanBoard() {
   const fetchTasks = async () => {
     setIsLoading(true); 
     try {
-      // Đã thêm ?project_id=null để chỉ lấy công việc cá nhân
       const response = await axios.get('https://kaban-api-backend-ro81.onrender.com/api/tasks?project_id=null', getAuthConfig()); 
       
-      const allTasks = response.data.data; 
+      const allTasks = response.data.data || response.data.tasks || []; 
 
       setBoardData({
-        "To Do": allTasks.filter(task => task.status === "To Do"),
-        "In progress": allTasks.filter(task => task.status === "In Progress" || task.status === "In progress"),
-        "Done": allTasks.filter(task => task.status === "Done")
+        "To Do": allTasks.filter(task => task.status === "To Do" || task.status === "todo" || !task.status),
+        "In progress": allTasks.filter(task => task.status === "In Progress" || task.status === "In progress" || task.status === "in_progress"),
+        "Done": allTasks.filter(task => task.status === "Done" || task.status === "done")
       });
 
     } catch (error) {
@@ -69,27 +70,55 @@ function KanbanBoard() {
     fetchTasks();
   }, []);
 
-  // 2. API TẠO TASK MỚI (POST)
-  const handleAddTask = async (newTask) => {
-    const { task_id, ...taskData } = newTask;
-    const toastId = toast.loading("Đang lưu công việc...");
+  // Mở Modal Tạo mới
+  const handleOpenCreateModal = () => {
+    setTaskToEdit(null);
+    setIsModalOpen(true);
+  };
 
-    const payloadToSubmit = {
-      ...taskData,
-      status: "To Do", 
-      project_id: null    
-    };
+  // Mở Modal Chỉnh sửa
+  const handleOpenEditModal = (task) => {
+    setTaskToEdit(task);
+    setIsModalOpen(true);
+  };
+
+  // 2. API LƯU TASK (XỬ LÝ CẢ THÊM MỚI VÀ CẬP NHẬT)
+  const handleSaveTask = async (taskPayload) => {
+    const isEditing = Boolean(taskPayload.task_id);
+    const toastId = toast.loading(isEditing ? "Đang cập nhật công việc..." : "Đang lưu công việc...");
 
     try {
-      await axios.post('https://kaban-api-backend-ro81.onrender.com/api/tasks', payloadToSubmit, getAuthConfig());
-      
-      toast.success("Thêm công việc thành công!", { id: toastId });
+      if (isEditing) {
+        // Cập nhật công việc hiện có (PUT)
+        await axios.put(`https://kaban-api-backend-ro81.onrender.com/api/tasks/${taskPayload.task_id}`, {
+          title: taskPayload.title,
+          description: taskPayload.description,
+          deadline: taskPayload.deadline,
+          priority: taskPayload.priority,
+          status: taskPayload.status || "To Do"
+        }, getAuthConfig());
+
+        toast.success("Cập nhật công việc thành công!", { id: toastId });
+      } else {
+        // Tạo công việc mới (POST)
+        const { task_id, ...taskData } = taskPayload;
+        const payloadToSubmit = {
+          ...taskData,
+          status: "To Do", 
+          project_id: null    
+        };
+        await axios.post('https://kaban-api-backend-ro81.onrender.com/api/tasks', payloadToSubmit, getAuthConfig());
+
+        toast.success("Thêm công việc thành công!", { id: toastId });
+      }
+
       setIsModalOpen(false); 
+      setTaskToEdit(null);
       fetchTasks(); 
       
     } catch (error) {
-      console.error("Lỗi POST:", error);
-      toast.error("Thêm thất bại, vui lòng thử lại!", { id: toastId });
+      console.error("Lỗi Save Task:", error);
+      toast.error("Thao tác thất bại, vui lòng thử lại!", { id: toastId });
     }
   };
 
@@ -103,7 +132,6 @@ function KanbanBoard() {
     const toastId = toast.loading("Đang luân chuyển công việc...");
 
     try {
-      // Đã bổ sung priority để giữ nguyên mức độ ưu tiên khi kéo thả
       await axios.put(`https://kaban-api-backend-ro81.onrender.com/api/tasks/${taskId}`, {
         title: fullTask.title,
         description: fullTask.description,
@@ -140,7 +168,6 @@ function KanbanBoard() {
     }
   };
 
-
   return (
     <div className="min-h-screen bg-green-50 p-8 font-sans relative">
       <Toaster position="top-right" reverseOrder={false} />
@@ -153,8 +180,8 @@ function KanbanBoard() {
   
           <div className="flex gap-4">
             <button 
-              onClick={() => setIsModalOpen(true)} 
-              className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-md font-medium shadow-sm transition-colors"
+              onClick={handleOpenCreateModal} 
+              className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-md font-medium shadow-sm transition-colors cursor-pointer"
             >
               + Thêm công việc
             </button>
@@ -163,7 +190,7 @@ function KanbanBoard() {
 
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
           </div>
         ) : (
           <div className="flex flex-col md:flex-row gap-6">
@@ -187,6 +214,7 @@ function KanbanBoard() {
                       allStatuses={Object.keys(boardData)} 
                       onMoveTask={handleMoveTask} 
                       onDeleteTask={handleDeleteTask}
+                      onEditTask={handleOpenEditModal}
                     />
                   ))}
                 </div>
@@ -198,8 +226,12 @@ function KanbanBoard() {
 
       <TaskModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onAddTask={handleAddTask} 
+        onClose={() => {
+          setIsModalOpen(false);
+          setTaskToEdit(null);
+        }} 
+        onAddTask={handleSaveTask} 
+        taskToEdit={taskToEdit}
       />
     </div>
   );
@@ -212,35 +244,69 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Route Công khai */}
         <Route path="/login" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/projects/:projectId" element={<ProjectDetail />} />
         
-      {/* 1. ĐƯỜNG DẪN TRANG CHỦ (Bảng Kanban cá nhân) - Bạn vừa lỡ tay xóa mất đoạn này */}
-      <Route 
-        path="/" 
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <KanbanBoard />
-            </Layout>
-          </ProtectedRoute>
-        } 
-      />
+        {/* Route Trang chủ & Task cá nhân */}
+        <Route 
+          path="/" 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <KanbanBoard />
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/tasks" 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <KanbanBoard />
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
   
-      {/* 2. ĐƯỜNG DẪN TRANG DỰ ÁN NHÓM (Mới thêm cho Ngày 16) */}
-      <Route 
-        path="/projects" 
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <ProjectList />
-            </Layout>
-          </ProtectedRoute>
-        } 
-      />
+        {/* Route Dự án nhóm */}
+        <Route 
+          path="/projects" 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ProjectList />
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/projects/:projectId" 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ProjectDetail />
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
 
-</Routes>
+        {/* Route Cài đặt */}
+        <Route 
+          path="/settings" 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Settings />
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* Route Fallback khi nhập sai đường dẫn */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </BrowserRouter>
   );
 }

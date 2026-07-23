@@ -9,14 +9,14 @@ function Layout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Danh sách các menu chức năng (Đã bổ sung Icon)
+  // Danh sách các menu chức năng (Đã cập nhật tên & Icon con người)
   const menuItems = [
     { 
-      name: 'Tổng quan (Dashboard)', 
+      name: 'Quản lý ST (Self Tasks)', 
       path: '/',
       icon: (
         <svg className="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
       )
     },
@@ -67,7 +67,7 @@ function Layout({ children }) {
           {/* Nút Toggle Menu */}
           <button 
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-2 text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg transition-colors focus:outline-none mx-auto"
+            className="p-2 text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg transition-colors focus:outline-none mx-auto cursor-pointer"
             title={isCollapsed ? "Mở rộng menu" : "Thu gọn menu"}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -79,7 +79,7 @@ function Layout({ children }) {
         {/* Danh sách Menu */}
         <nav className="flex-1 p-4 flex flex-col gap-2 overflow-y-auto overflow-x-hidden">
           {menuItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path || (item.path === '/' && location.pathname === '/tasks');
             return (
               <Link 
                 key={item.name} 
@@ -87,7 +87,7 @@ function Layout({ children }) {
                 title={isCollapsed ? item.name : ""}
                 className={`flex items-center gap-4 px-3 py-3 rounded-lg font-medium transition-all duration-200 ${
                   isActive 
-                    ? 'bg-emerald-50 text-emerald-600' 
+                    ? 'bg-emerald-50 text-emerald-600 font-semibold' 
                     : 'text-gray-600 hover:bg-gray-50 hover:text-emerald-500'
                 }`}
               >
@@ -107,7 +107,7 @@ function Layout({ children }) {
           <button 
             onClick={handleLogout}
             title={isCollapsed ? "Đăng xuất" : ""}
-            className={`flex items-center gap-4 w-full px-3 py-3 rounded-md font-medium transition-colors ${
+            className={`flex items-center gap-4 w-full px-3 py-3 rounded-md font-medium transition-colors cursor-pointer ${
               isCollapsed ? 'justify-center bg-red-50 text-red-500 hover:bg-red-500 hover:text-white' : 'bg-red-50 text-red-500 hover:bg-red-500 hover:text-white'
             }`}
           >
