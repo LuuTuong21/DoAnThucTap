@@ -10,6 +10,7 @@ import Layout from './components/Layout';
 import ProjectList from './components/ProjectList';
 import ProjectDetail from "./components/ProjectDetail";
 import Settings from './components/Settings';
+import AdminUsers from './components/AdminUsers';
 
 // --- 1. COMPONENT BẢO VỆ: KIỂM TRA XEM CÓ THẺ TOKEN CHƯA ---
 const ProtectedRoute = ({ children }) => {
@@ -299,6 +300,18 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <Settings />
+              </Layout>
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* Route Admin - Quản lý tài khoản người dùng */}
+        <Route 
+          path="/admin/users" 
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <AdminUsers />
               </Layout>
             </ProtectedRoute>
           } 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 import { Link } from 'react-router-dom';
-import ProjectModal from './ProjectModal'; // Thêm dòng này
+import ProjectModal from './ProjectModal';
 
 function ProjectList() {
   const [projects, setProjects] = useState([]);
@@ -58,7 +58,7 @@ function ProjectList() {
         </h1>
         <button 
           onClick={() => setIsModalOpen(true)} // Gắn sự kiện mở Modal
-          className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-lg font-medium shadow-md transition-colors flex items-center gap-2"
+          className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-lg font-medium shadow-md transition-colors flex items-center gap-2 cursor-pointer"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
@@ -80,26 +80,41 @@ function ProjectList() {
           {projects.map((project) => (
             <div key={project.project_id} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all group flex flex-col justify-between">
               <div>
-                <div className="flex justify-between items-start mb-4">
+                {/* HÀNG 1: Tên dự án & Nhãn vai trò */}
+                <div className="flex justify-between items-start mb-4 gap-2">
                   <h3 className="text-xl font-bold text-gray-800 group-hover:text-emerald-600 transition-colors pr-2 break-all">
                     {project.name}
                   </h3>
-                  <span className="text-[10px] uppercase tracking-wider font-bold bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full whitespace-nowrap">
+                  <span className={`text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full whitespace-nowrap shrink-0 ${
+                    project.role?.toLowerCase() === 'leader' 
+                      ? 'bg-purple-100 text-purple-700' 
+                      : 'bg-emerald-100 text-emerald-700'
+                  }`}>
                     {project.role || 'Member'}
                   </span>
                 </div>
                 
                 {project.description && (
-                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                  <p className="text-sm text-gray-600 mb-4 line-clamp-2 whitespace-pre-line">
                     {project.description}
                   </p>
                 )}
               </div>
               
               <div>
-                <div className="text-xs text-gray-400 mb-4">
-                  Tạo ngày: {new Date(project.created_at).toLocaleDateString('vi-VN')}
+                {/* HÀNG 2: Ngày tạo (Trái) & Người tạo (Phải - Dưới nhãn vai trò) */}
+                <div className="flex justify-between items-center text-xs text-gray-400 mb-4 gap-2">
+                  <span>
+                    Tạo ngày: {project.created_at ? new Date(project.created_at).toLocaleDateString('vi-VN') : 'N/A'}
+                  </span>
+                  
+                  {/* Hiển thị Tên người tạo dự án */}
+                  <span className="font-medium text-gray-600 truncate max-w-[50%] text-right">
+                    Tạo bởi: <strong className="text-gray-800 font-semibold">{project.created_by_name || project.creator_name || project.owner_name || 'N/A'}</strong>
+                  </span>
                 </div>
+
+                {/* HÀNG 3: Nút vào bảng công việc */}
                 <Link 
                   to={`/projects/${project.project_id}`}
                   className="block text-center w-full bg-gray-50 hover:bg-emerald-50 text-gray-700 hover:text-emerald-600 py-2 rounded-md font-medium border border-gray-200 hover:border-emerald-200 transition-colors"

@@ -14,7 +14,7 @@ function ProjectDetail() {
 
   // State cho Modal Tạo / Sửa Task
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState(null); // null = tạo mới, object = đang sửa
+  const [editingTask, setEditingTask] = useState(null);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDesc, setTaskDesc] = useState('');
   const [taskPriority, setTaskPriority] = useState('Medium');
@@ -30,6 +30,26 @@ function ProjectDetail() {
   // State hỗ trợ tìm kiếm thành viên theo tên hoặc email
   const [memberSearch, setMemberSearch] = useState('');
   const [isMemberDropdownOpen, setIsMemberDropdownOpen] = useState(false);
+
+  // HÀM GIẢI MÃ TOKEN ĐỂ LẤY USER_ID HIỆN TẠI
+  const getCurrentUserId = () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return null;
+      const payloadBase64 = token.split('.')[1];
+      const decodedJson = atob(payloadBase64);
+      const decoded = JSON.parse(decodedJson);
+      return decoded.id || decoded.user_id;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const currentUserId = getCurrentUserId();
+  
+  // KIỂM TRA XEM USER HIỆN TẠI CÓ PHẢI LEADER CỦA DỰ ÁN KHÔNG
+  const currentMemberInfo = members.find(m => m.user_id === currentUserId);
+  const isLeader = currentMemberInfo ? (currentMemberInfo.role?.toLowerCase() === 'leader') : false;
 
   // Hàm tải thông tin dự án, danh sách task và thành viên
   const fetchProjectData = async () => {
@@ -81,7 +101,6 @@ function ProjectDetail() {
     setTaskStatus(task.status || 'To Do');
     setAssignedTo(task.assigned_to);
     
-    // Chuyển deadline về định dạng YYYY-MM-THH:mm cho input datetime-local
     if (task.deadline) {
       const d = new Date(task.deadline);
       const formatted = d.toISOString().slice(0, 16);
@@ -113,12 +132,10 @@ function ProjectDetail() {
     try {
       const token = localStorage.getItem('token');
       if (editingTask) {
-        // Gọi API Cập nhật Task
         await axios.put(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}/tasks/${editingTask.task_id}`, payload, {
           headers: { Authorization: `Bearer ${token}` }
         });
       } else {
-        // Gọi API Tạo Task mới
         await axios.post(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}/tasks`, payload, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -132,8 +149,13 @@ function ProjectDetail() {
     }
   };
 
-  // Hàm xử lý Xóa Task
+  // Hàm xử lý Xóa Task (Chỉ cho phép nếu là Leader)
   const handleDeleteTask = async (taskId) => {
+    if (!isLeader) {
+      alert("Thành viên không có quyền xóa công việc!");
+      return;
+    }
+
     if (!window.confirm("Bạn có chắc chắn muốn xóa công việc này?")) return;
 
     try {
@@ -144,7 +166,29 @@ function ProjectDetail() {
       fetchProjectData();
     } catch (err) {
       console.error("Lỗi xóa task:", err);
-      alert("Không thể xóa công việc này!");
+      alert(err.response?.data?.message || "Không thể xóa công việc này!");
+    }
+  };
+
+  // Hàm xử lý Xóa Dự Án (Chỉ cho phép nếu là Leader)
+  const handleDeleteProject = async () => {
+    if (!isLeader) {
+      alert("Chỉ Trưởng dự án (Leader) mới được phép xóa dự án này!");
+      return;
+    }
+
+    if (!window.confirm("CẢNH BÁO: Bạn có chắc chắn muốn xóa TOÀN BỘ dự án này không? Thao tác này không thể hoàn tác!")) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert("Đã xóa dự án thành công!");
+      navigate('/projects');
+    } catch (err) {
+      console.error("Lỗi xóa dự án:", err);
+      alert(err.response?.data?.message || "Không thể xóa dự án này!");
     }
   };
 
@@ -246,12 +290,26 @@ function ProjectDetail() {
           <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${task.priority === 'High' ? 'bg-red-100 text-red-600' : task.priority === 'Medium' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>
             {task.priority}
           </span>
-          <button onClick={() => openEditModal(task)} title="Sửa công việc" className="text-gray-400 hover:text-blue-600 p-1 cursor-pointer">
-            ✏️
-          </button>
-          <button onClick={() => handleDeleteTask(task.task_id)} title="Xóa công việc" className="text-gray-400 hover:text-red-600 p-1 cursor-pointer">
-            🗑️
-          </button>
+
+          {/* CHỈ LEADER MỚI THẤY NÚT SỬA ✏️ VÀ NÚT XÓA 🗑️ */}
+          {isLeader && (
+            <>
+              <button 
+                onClick={() => openEditModal(task)} 
+                title="Sửa công việc (Chỉ dành cho Leader)" 
+                className="text-gray-400 hover:text-blue-600 p-1 cursor-pointer"
+              >
+                ✏️
+              </button>
+              <button 
+                onClick={() => handleDeleteTask(task.task_id)} 
+                title="Xóa công việc (Chỉ dành cho Leader)" 
+                className="text-gray-400 hover:text-red-600 p-1 cursor-pointer"
+              >
+                🗑️
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -293,19 +351,35 @@ function ProjectDetail() {
           <p className="text-sm text-gray-500">{project?.description || "Không có mô tả"}</p>
         </div>
         
-        <div className="flex gap-3">
-          <button 
-            onClick={() => setIsMemberModalOpen(true)}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all cursor-pointer"
-          >
-            + Thêm thành viên
-          </button>
-          <button 
-            onClick={openCreateModal}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold shadow-md shadow-emerald-500/30 transition-all cursor-pointer"
-          >
-            + Thêm Task mới
-          </button>
+        <div className="flex gap-3 items-center">
+          {/* CHỈ LEADER MỚI THẤY NÚT XÓA DỰ ÁN */}
+          {isLeader && (
+            <button 
+              onClick={handleDeleteProject}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold shadow-md shadow-red-500/20 transition-all cursor-pointer"
+              title="Xóa dự án (Chỉ dành cho Leader)"
+            >
+              🗑️ Xóa dự án
+            </button>
+          )}
+
+          {/* CHỈ LEADER MỚI THẤY NÚT THÊM THÀNH VIÊN VÀ NÚT THÊM TASK */}
+          {isLeader && (
+            <>
+              <button 
+                onClick={() => setIsMemberModalOpen(true)}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all cursor-pointer"
+              >
+                + Thêm thành viên
+              </button>
+              <button 
+                onClick={openCreateModal}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold shadow-md shadow-emerald-500/30 transition-all cursor-pointer"
+              >
+                + Thêm Task mới
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -316,7 +390,9 @@ function ProjectDetail() {
           {members.map(m => (
             <div key={m.user_id} className="bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs">
               <span className="font-semibold text-gray-800">{m.name || m.email}</span>
-              <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-medium">{m.role}</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${m.role?.toLowerCase() === 'leader' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-emerald-100 text-emerald-700'}`}>
+                {m.role}
+              </span>
             </div>
           ))}
         </div>
