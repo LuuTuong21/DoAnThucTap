@@ -1,70 +1,99 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+
+const API_BASE_URL = 'https://kaban-api-backend-ro81.onrender.com/api';
+
+// Hàm giải mã JWT an toàn hỗ trợ Unicode/URL-safe base64
+const decodeJWT = (token) => {
+  try {
+    if (!token) return null;
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+};
 
 function ProjectDetail() {
   const { projectId } = useParams();
   const navigate = useNavigate();
-  
+  const dropdownRef = useRef(null);
+
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
-  const [members, setMembers] = useState([]); 
+  const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // State cho Modal Tạo / Sửa Task
+  // State Modal Tạo / Sửa Task
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDesc, setTaskDesc] = useState('');
   const [taskPriority, setTaskPriority] = useState('Medium');
   const [taskStatus, setTaskStatus] = useState('To Do');
-  const [assignedTo, setAssignedTo] = useState(''); 
+  const [assignedTo, setAssignedTo] = useState('');
   const [taskDeadline, setTaskDeadline] = useState('');
 
-  // State cho Modal thêm thành viên
+  // State Modal thêm thành viên
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('Member');
 
-  // State hỗ trợ tìm kiếm thành viên theo tên hoặc email
+  // State Tìm kiếm người thực hiện trong Task Modal
   const [memberSearch, setMemberSearch] = useState('');
   const [isMemberDropdownOpen, setIsMemberDropdownOpen] = useState(false);
 
-  // HÀM GIẢI MÃ TOKEN ĐỂ LẤY USER_ID HIỆN TẠI
+  // Helper lấy config Authorization
+  const getAuthHeader = () => {
+    const token = localStorage.getItem('token');
+    return { headers: { Authorization: `Bearer ${token}` } };
+  };
+
+  // Lấy User ID hiện tại từ Token
   const getCurrentUserId = () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return null;
-      const payloadBase64 = token.split('.')[1];
-      const decodedJson = atob(payloadBase64);
-      const decoded = JSON.parse(decodedJson);
-      return decoded.id || decoded.user_id;
-    } catch (e) {
-      return null;
-    }
+    const token = localStorage.getItem('token');
+    const decoded = decodeJWT(token);
+    return decoded ? decoded.id || decoded.user_id : null;
   };
 
   const currentUserId = getCurrentUserId();
-  
-  // KIỂM TRA XEM USER HIỆN TẠI CÓ PHẢI LEADER CỦA DỰ ÁN KHÔNG
-  const currentMemberInfo = members.find(m => m.user_id === currentUserId);
-  const isLeader = currentMemberInfo ? (currentMemberInfo.role?.toLowerCase() === 'leader') : false;
+  const currentMemberInfo = members.find((m) => m.user_id === currentUserId);
+  const isLeader = currentMemberInfo ? currentMemberInfo.role?.toLowerCase() === 'leader' : false;
 
-  // Hàm tải thông tin dự án, danh sách task và thành viên
+  // Đóng dropdown chọn người thực hiện khi click ra bên ngoài
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsMemberDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Tải dữ liệu dự án
   const fetchProjectData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`${API_BASE_URL}/projects/${projectId}`, getAuthHeader());
 
       if (response.data.success) {
         setProject(response.data.project);
         setTasks(response.data.tasks || []);
-        setMembers(response.data.members || []);
-        if (response.data.members && response.data.members.length > 0 && !assignedTo) {
-          setAssignedTo(response.data.members[0].user_id);
+        const memberList = response.data.members || [];
+        setMembers(memberList);
+
+        if (memberList.length > 0 && !assignedTo) {
+          setAssignedTo(memberList[0].user_id);
         }
       }
     } catch (err) {
@@ -79,7 +108,7 @@ function ProjectDetail() {
     fetchProjectData();
   }, [projectId]);
 
-  // Mở modal tạo task mới
+  // Mở modal tạo Task
   const openCreateModal = () => {
     setEditingTask(null);
     setTaskTitle('');
@@ -92,7 +121,7 @@ function ProjectDetail() {
     setIsModalOpen(true);
   };
 
-  // Mở modal sửa task
+  // Mở modal sửa Task
   const openEditModal = (task) => {
     setEditingTask(task);
     setTaskTitle(task.title);
@@ -100,10 +129,10 @@ function ProjectDetail() {
     setTaskPriority(task.priority || 'Medium');
     setTaskStatus(task.status || 'To Do');
     setAssignedTo(task.assigned_to);
-    
+
     if (task.deadline) {
       const d = new Date(task.deadline);
-      const formatted = d.toISOString().slice(0, 16);
+      const formatted = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
       setTaskDeadline(formatted);
     } else {
       setTaskDeadline('');
@@ -112,7 +141,7 @@ function ProjectDetail() {
     setIsModalOpen(true);
   };
 
-  // Hàm xử lý lưu Task (Tạo mới hoặc Cập nhật)
+  // Lưu Task
   const handleSaveTask = async (e) => {
     e.preventDefault();
     if (!assignedTo) {
@@ -130,15 +159,10 @@ function ProjectDetail() {
     };
 
     try {
-      const token = localStorage.getItem('token');
       if (editingTask) {
-        await axios.put(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}/tasks/${editingTask.task_id}`, payload, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await axios.put(`${API_BASE_URL}/projects/${projectId}/tasks/${editingTask.task_id}`, payload, getAuthHeader());
       } else {
-        await axios.post(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}/tasks`, payload, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await axios.post(`${API_BASE_URL}/projects/${projectId}/tasks`, payload, getAuthHeader());
       }
 
       setIsModalOpen(false);
@@ -149,20 +173,13 @@ function ProjectDetail() {
     }
   };
 
-  // Hàm xử lý Xóa Task (Chỉ cho phép nếu là Leader)
+  // Xóa Task
   const handleDeleteTask = async (taskId) => {
-    if (!isLeader) {
-      alert("Thành viên không có quyền xóa công việc!");
-      return;
-    }
-
+    if (!isLeader) return alert("Thành viên không có quyền xóa công việc!");
     if (!window.confirm("Bạn có chắc chắn muốn xóa công việc này?")) return;
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}/tasks/${taskId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.delete(`${API_BASE_URL}/projects/${projectId}/tasks/${taskId}`, getAuthHeader());
       fetchProjectData();
     } catch (err) {
       console.error("Lỗi xóa task:", err);
@@ -170,20 +187,13 @@ function ProjectDetail() {
     }
   };
 
-  // Hàm xử lý Xóa Dự Án (Chỉ cho phép nếu là Leader)
+  // Xóa Dự Án
   const handleDeleteProject = async () => {
-    if (!isLeader) {
-      alert("Chỉ Trưởng dự án (Leader) mới được phép xóa dự án này!");
-      return;
-    }
-
+    if (!isLeader) return alert("Chỉ Trưởng dự án (Leader) mới được phép xóa dự án này!");
     if (!window.confirm("CẢNH BÁO: Bạn có chắc chắn muốn xóa TOÀN BỘ dự án này không? Thao tác này không thể hoàn tác!")) return;
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.delete(`${API_BASE_URL}/projects/${projectId}`, getAuthHeader());
       alert("Đã xóa dự án thành công!");
       navigate('/projects');
     } catch (err) {
@@ -192,20 +202,36 @@ function ProjectDetail() {
     }
   };
 
-  // Hàm thay đổi trạng thái task trực tiếp từ dropdown
+  // Xóa Thành Viên khỏi Dự Án
+  const handleRemoveMember = async (memberId, memberName) => {
+    if (!isLeader) return;
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa thành viên "${memberName}" khỏi dự án này?`)) return;
+
+    try {
+      await axios.delete(`${API_BASE_URL}/projects/${projectId}/members/${memberId}`, getAuthHeader());
+      alert("Đã xóa thành viên thành công!");
+      fetchProjectData();
+    } catch (err) {
+      console.error("Lỗi xóa thành viên:", err);
+      alert(err.response?.data?.message || "Không thể xóa thành viên!");
+    }
+  };
+
+  // Đổi trạng thái Task nhanh
   const handleStatusChange = async (task, newStatus) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}/tasks/${task.task_id}`, {
-        title: task.title,
-        description: task.description,
-        priority: task.priority,
-        status: newStatus,
-        assigned_to: task.assigned_to,
-        deadline: task.deadline
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.put(
+        `${API_BASE_URL}/projects/${projectId}/tasks/${task.task_id}`,
+        {
+          title: task.title,
+          description: task.description,
+          priority: task.priority,
+          status: newStatus,
+          assigned_to: task.assigned_to,
+          deadline: task.deadline
+        },
+        getAuthHeader()
+      );
       fetchProjectData();
     } catch (err) {
       console.error("Lỗi đổi trạng thái task:", err);
@@ -213,17 +239,15 @@ function ProjectDetail() {
     }
   };
 
-  // Hàm xử lý thêm thành viên vào dự án
+  // Thêm Thành Viên
   const handleAddMember = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post(`https://kaban-api-backend-ro81.onrender.com/api/projects/${projectId}/members`, {
-        email: newMemberEmail,
-        role: newMemberRole
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.post(
+        `${API_BASE_URL}/projects/${projectId}/members`,
+        { email: newMemberEmail, role: newMemberRole },
+        getAuthHeader()
+      );
 
       if (response.data.success) {
         alert("Thêm thành viên thành công!");
@@ -250,7 +274,7 @@ function ProjectDetail() {
     return (
       <div className="p-8 text-center">
         <p className="text-red-500 mb-4">{error}</p>
-        <button 
+        <button
           onClick={() => navigate('/projects')}
           className="bg-gray-800 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-all cursor-pointer"
         >
@@ -260,26 +284,25 @@ function ProjectDetail() {
     );
   }
 
-  // Phân loại task theo trạng thái Kanban
-  const todoTasks = tasks.filter(t => t.status === 'To Do' || t.status === 'todo' || !t.status);
-  const inProgressTasks = tasks.filter(t => t.status === 'In progress' || t.status === 'in_progress');
-  const doneTasks = tasks.filter(t => t.status === 'Done' || t.status === 'done');
+  // Phân loại Task
+  const todoTasks = tasks.filter((t) => t.status === 'To Do' || t.status === 'todo' || !t.status);
+  const inProgressTasks = tasks.filter((t) => t.status === 'In progress' || t.status === 'in_progress');
+  const doneTasks = tasks.filter((t) => t.status === 'Done' || t.status === 'done');
 
-  // Hàm lấy tên người thực hiện dựa vào user_id
   const getAssigneeName = (userId) => {
-    const member = members.find(m => m.user_id === userId);
-    return member ? (member.name || member.email) : 'Chưa phân công';
+    const member = members.find((m) => m.user_id === userId);
+    return member ? member.name || member.email : 'Chưa phân công';
   };
 
-  // Lọc danh sách thành viên theo tên hoặc email
-  const filteredMembers = members.filter(m => 
-    (m.name && m.name.toLowerCase().includes(memberSearch.toLowerCase())) ||
-    (m.email && m.email.toLowerCase().includes(memberSearch.toLowerCase()))
+  const filteredMembers = members.filter(
+    (m) =>
+      (m.name && m.name.toLowerCase().includes(memberSearch.toLowerCase())) ||
+      (m.email && m.email.toLowerCase().includes(memberSearch.toLowerCase()))
   );
 
-  const selectedMember = members.find(m => m.user_id === assignedTo);
+  const selectedMember = members.find((m) => m.user_id === assignedTo);
 
-  // Render chung cho từng thẻ Task Card
+  // Thẻ Task Card
   const renderTaskCard = (task) => (
     <div key={task.task_id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow flex flex-col gap-2">
       <div className="flex justify-between items-start gap-2">
@@ -291,19 +314,18 @@ function ProjectDetail() {
             {task.priority}
           </span>
 
-          {/* CHỈ LEADER MỚI THẤY NÚT SỬA ✏️ VÀ NÚT XÓA 🗑️ */}
           {isLeader && (
             <>
-              <button 
-                onClick={() => openEditModal(task)} 
-                title="Sửa công việc (Chỉ dành cho Leader)" 
+              <button
+                onClick={() => openEditModal(task)}
+                title="Sửa công việc"
                 className="text-gray-400 hover:text-blue-600 p-1 cursor-pointer"
               >
                 ✏️
               </button>
-              <button 
-                onClick={() => handleDeleteTask(task.task_id)} 
-                title="Xóa công việc (Chỉ dành cho Leader)" 
+              <button
+                onClick={() => handleDeleteTask(task.task_id)}
+                title="Xóa công việc"
                 className="text-gray-400 hover:text-red-600 p-1 cursor-pointer"
               >
                 🗑️
@@ -313,16 +335,16 @@ function ProjectDetail() {
         </div>
       </div>
 
-      <p className="text-xs text-gray-500 whitespace-pre-line">{task.description}</p>
-      
+      <p className="text-xs text-gray-500 whitespace-pre-line wrap-break-word break-all">{task.description}</p>
+
       <div className="flex justify-between items-center text-[10px] text-gray-400 border-t pt-2 mt-1">
         <span>👤 {getAssigneeName(task.assigned_to)}</span>
         {task.deadline && <span>🕒 {new Date(task.deadline).toLocaleString()}</span>}
       </div>
 
       <div className="flex justify-end mt-1">
-        <select 
-          value={task.status} 
+        <select
+          value={task.status}
           onChange={(e) => handleStatusChange(task, e.target.value)}
           className="text-[11px] bg-gray-50 border border-gray-300 rounded px-2 py-1 font-medium text-gray-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
         >
@@ -336,10 +358,10 @@ function ProjectDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 flex flex-col">
-      {/* Header trang chi tiết */}
-      <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <div>
-          <button 
+      {/* Header */}
+      <div className="flex justify-between items-start gap-4 mb-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div className="max-w-[70%]">
+          <button
             onClick={() => navigate('/projects')}
             className="text-sm text-emerald-600 hover:underline mb-1 inline-block font-medium cursor-pointer"
           >
@@ -348,31 +370,29 @@ function ProjectDetail() {
           <h1 className="text-2xl font-bold text-gray-800">
             {project ? project.name : "Chi tiết dự án"}
           </h1>
-          <p className="text-sm text-gray-500">{project?.description || "Không có mô tả"}</p>
+          {/* Sửa tràn chữ ở phần mô tả bằng break-words break-all */}
+          <p className="text-sm text-gray-500 wrap-break-words break-all whitespace-pre-line mt-1">
+            {project?.description || "Không có mô tả"}
+          </p>
         </div>
-        
-        <div className="flex gap-3 items-center">
-          {/* CHỈ LEADER MỚI THẤY NÚT XÓA DỰ ÁN */}
-          {isLeader && (
-            <button 
-              onClick={handleDeleteProject}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold shadow-md shadow-red-500/20 transition-all cursor-pointer"
-              title="Xóa dự án (Chỉ dành cho Leader)"
-            >
-              🗑️ Xóa dự án
-            </button>
-          )}
 
-          {/* CHỈ LEADER MỚI THẤY NÚT THÊM THÀNH VIÊN VÀ NÚT THÊM TASK */}
+        <div className="flex gap-3 items-center shrink-0">
           {isLeader && (
             <>
-              <button 
+              <button
+                onClick={handleDeleteProject}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold shadow-md shadow-red-500/20 transition-all cursor-pointer"
+                title="Xóa dự án (Chỉ dành cho Leader)"
+              >
+                🗑️ Xóa dự án
+              </button>
+              <button
                 onClick={() => setIsMemberModalOpen(true)}
                 className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all cursor-pointer"
               >
                 + Thêm thành viên
               </button>
-              <button 
+              <button
                 onClick={openCreateModal}
                 className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold shadow-md shadow-emerald-500/30 transition-all cursor-pointer"
               >
@@ -383,25 +403,35 @@ function ProjectDetail() {
         </div>
       </div>
 
-      {/* Khu vực hiển thị danh sách thành viên dự án */}
+      {/* Danh sách thành viên */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
         <h3 className="text-sm font-bold text-gray-700 mb-2">👥 Thành viên tham gia dự án ({members.length})</h3>
         <div className="flex flex-wrap gap-2">
-          {members.map(m => (
+          {members.map((m) => (
             <div key={m.user_id} className="bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs">
               <span className="font-semibold text-gray-800">{m.name || m.email}</span>
               <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${m.role?.toLowerCase() === 'leader' ? 'bg-purple-100 text-purple-700 font-bold' : 'bg-emerald-100 text-emerald-700'}`}>
                 {m.role}
               </span>
+              
+              {/* Nút ✕ Xóa thành viên (Chỉ hiển thị cho Leader và không tự xóa bản thân) */}
+              {isLeader && m.user_id !== currentUserId && (
+                <button
+                  onClick={() => handleRemoveMember(m.user_id, m.name || m.email)}
+                  title="Xóa thành viên khỏi dự án"
+                  className="text-gray-400 hover:text-red-600 font-bold ml-1 cursor-pointer transition-colors px-1"
+                >
+                  ✕
+                </button>
+              )}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Bảng Kanban 3 cột */}
+      {/* Bảng Kanban */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 grow">
-        
-        {/* Cột 1: To Do */}
+        {/* To Do */}
         <div className="bg-gray-100/80 rounded-xl p-4 flex flex-col border border-gray-200">
           <h3 className="font-bold text-gray-700 mb-3 flex justify-between items-center">
             <span>📌 To Do</span>
@@ -416,7 +446,7 @@ function ProjectDetail() {
           </div>
         </div>
 
-        {/* Cột 2: In Progress */}
+        {/* In Progress */}
         <div className="bg-gray-100/80 rounded-xl p-4 flex flex-col border border-gray-200">
           <h3 className="font-bold text-gray-700 mb-3 flex justify-between items-center">
             <span>⚡ In progress</span>
@@ -431,7 +461,7 @@ function ProjectDetail() {
           </div>
         </div>
 
-        {/* Cột 3: Done */}
+        {/* Done */}
         <div className="bg-gray-100/80 rounded-xl p-4 flex flex-col border border-gray-200">
           <h3 className="font-bold text-gray-700 mb-3 flex justify-between items-center">
             <span>✅ Done</span>
@@ -445,7 +475,6 @@ function ProjectDetail() {
             )}
           </div>
         </div>
-
       </div>
 
       {/* Modal Tạo/Sửa Task */}
@@ -460,11 +489,11 @@ function ProjectDetail() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Tiêu đề công việc <span className="text-red-500">*</span>
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
-                  value={taskTitle} 
-                  onChange={(e) => setTaskTitle(e.target.value)} 
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
                   placeholder="Nhập tiêu đề..."
                   className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 text-sm"
                 />
@@ -472,9 +501,9 @@ function ProjectDetail() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
-                <textarea 
-                  value={taskDesc} 
-                  onChange={(e) => setTaskDesc(e.target.value)} 
+                <textarea
+                  value={taskDesc}
+                  onChange={(e) => setTaskDesc(e.target.value)}
                   placeholder="Nhập mô tả chi tiết..."
                   className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 resize-none h-20 text-sm"
                 ></textarea>
@@ -485,9 +514,9 @@ function ProjectDetail() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Độ ưu tiên <span className="text-red-500">*</span>
                   </label>
-                  <select 
+                  <select
                     required
-                    value={taskPriority} 
+                    value={taskPriority}
                     onChange={(e) => setTaskPriority(e.target.value)}
                     className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 text-sm"
                   >
@@ -499,8 +528,8 @@ function ProjectDetail() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
-                  <select 
-                    value={taskStatus} 
+                  <select
+                    value={taskStatus}
                     onChange={(e) => setTaskStatus(e.target.value)}
                     className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 text-sm"
                   >
@@ -511,15 +540,15 @@ function ProjectDetail() {
                 </div>
               </div>
 
-              {/* Phần chọn người thực hiện */}
-              <div className="relative">
+              {/* Chọn người thực hiện */}
+              <div className="relative" ref={dropdownRef}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Người thực hiện <span className="text-red-500">*</span>
                 </label>
-                <input 
+                <input
                   type="text"
                   placeholder="Gõ tên hoặc email..."
-                  value={isMemberDropdownOpen ? memberSearch : (selectedMember ? (selectedMember.name || selectedMember.email) : '')}
+                  value={isMemberDropdownOpen ? memberSearch : selectedMember ? selectedMember.name || selectedMember.email : ''}
                   onFocus={() => {
                     setIsMemberDropdownOpen(true);
                     setMemberSearch('');
@@ -530,14 +559,14 @@ function ProjectDetail() {
                   }}
                   className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 text-sm"
                 />
-                
+
                 {isMemberDropdownOpen && (
                   <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
                     {filteredMembers.length === 0 ? (
                       <div className="p-2 text-xs text-gray-500 text-center">Không tìm thấy kết quả phù hợp</div>
                     ) : (
-                      filteredMembers.map(member => (
-                        <div 
+                      filteredMembers.map((member) => (
+                        <div
                           key={member.user_id}
                           onClick={() => {
                             setAssignedTo(member.user_id);
@@ -556,27 +585,27 @@ function ProjectDetail() {
                 )}
               </div>
 
-              {/* Ô chọn Ngày và Giờ phút */}
+              {/* Hạn chót */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Hạn chót (Deadline)</label>
-                <input 
-                  type="datetime-local" 
-                  value={taskDeadline} 
-                  onChange={(e) => setTaskDeadline(e.target.value)} 
+                <input
+                  type="datetime-local"
+                  value={taskDeadline}
+                  onChange={(e) => setTaskDeadline(e.target.value)}
                   className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 text-sm"
                 />
               </div>
 
               <div className="flex justify-end gap-3 mt-4">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setIsModalOpen(false)}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 cursor-pointer text-sm font-medium"
                 >
                   Hủy
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium shadow-md shadow-emerald-500/20 cursor-pointer text-sm"
                 >
                   {editingTask ? "Cập nhật" : "Tạo task"}
@@ -597,11 +626,11 @@ function ProjectDetail() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Email thành viên <span className="text-red-500">*</span>
                 </label>
-                <input 
-                  type="email" 
+                <input
+                  type="email"
                   required
-                  value={newMemberEmail} 
-                  onChange={(e) => setNewMemberEmail(e.target.value)} 
+                  value={newMemberEmail}
+                  onChange={(e) => setNewMemberEmail(e.target.value)}
                   placeholder="Nhập email tài khoản..."
                   className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500 text-sm"
                 />
@@ -609,8 +638,8 @@ function ProjectDetail() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Vai trò</label>
-                <select 
-                  value={newMemberRole} 
+                <select
+                  value={newMemberRole}
                   onChange={(e) => setNewMemberRole(e.target.value)}
                   className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500 text-sm"
                 >
@@ -620,15 +649,15 @@ function ProjectDetail() {
               </div>
 
               <div className="flex justify-end gap-3 mt-4">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setIsMemberModalOpen(false)}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 cursor-pointer text-sm font-medium"
                 >
                   Hủy
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium shadow-md shadow-blue-500/20 cursor-pointer text-sm"
                 >
                   Thêm thành viên

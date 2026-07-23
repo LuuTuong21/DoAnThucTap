@@ -182,3 +182,37 @@
     border-right-color: var(--border);
   }
 }
+
+/* Container chứa các thẻ thành viên */
+.member-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 14px;
+}
+
+/* Style nút dấu X */
+.btn-remove-member {
+    background: transparent;
+    border: none;
+    color: #ff4d4f;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0 3px;
+    line-height: 1;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-remove-member:hover {
+    color: #ffffff;
+    background-color: #ff4d4f;
+}
