@@ -170,7 +170,7 @@ function KanbanBoard() {
   };
 
   return (
-    <div className="min-h-screen bg-green-50 p-8 font-sans relative">
+    <div className="min-h-screen bg-white p-8 font-sans relative">
       <Toaster position="top-right" reverseOrder={false} />
 
       <div className="max-w-7xl mx-auto">
