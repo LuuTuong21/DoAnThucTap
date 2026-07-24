@@ -4,6 +4,15 @@ import axios from 'axios';
 
 const API_BASE_URL = 'https://kaban-api-backend-ro81.onrender.com/api';
 
+// Hàm chuyển Date từ API sang dạng "YYYY-MM-DDTHH:mm" cho datetime-local (Không bị cộng/trừ 7 tiếng)
+const formatToDatetimeLocal = (dateString) => {
+  if (!dateString) return '';
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return '';
+  const pad = (num) => String(num).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 // Hàm giải mã JWT an toàn hỗ trợ Unicode/URL-safe base64
 const decodeJWT = (token) => {
   try {
@@ -121,7 +130,7 @@ function ProjectDetail() {
     setIsModalOpen(true);
   };
 
-  // Mở modal sửa Task
+  // Mở modal sửa Task (Đã sửa không bị lệch giờ)
   const openEditModal = (task) => {
     setEditingTask(task);
     setTaskTitle(task.title);
@@ -129,19 +138,11 @@ function ProjectDetail() {
     setTaskPriority(task.priority || 'Medium');
     setTaskStatus(task.status || 'To Do');
     setAssignedTo(task.assigned_to);
-
-    if (task.deadline) {
-      const d = new Date(task.deadline);
-      const formatted = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-      setTaskDeadline(formatted);
-    } else {
-      setTaskDeadline('');
-    }
-
+    setTaskDeadline(formatToDatetimeLocal(task.deadline)); // 👈 ĐÃ SỬA: Dùng hàm format local chuẩn
     setIsModalOpen(true);
   };
 
-  // Lưu Task
+  // Lưu Task (Đã thêm kiểm tra bắt buộc Deadline & sửa lỗi lệch 7 giờ)
   const handleSaveTask = async (e) => {
     e.preventDefault();
     if (!assignedTo) {
@@ -149,13 +150,22 @@ function ProjectDetail() {
       return;
     }
 
+    // 👈 BẮT BUỘC NHẬP DEADLINE CHO PROJECT TASK
+    if (!taskDeadline) {
+      alert("Vui lòng chọn hạn chót (Deadline) cho công việc dự án!");
+      return;
+    }
+
+    // 👈 CHUYỂN "YYYY-MM-DDTHH:mm" THÀNH "YYYY-MM-DD HH:mm:00" ĐỂ LƯU VÀO CSDL
+    const formattedDeadline = taskDeadline.replace('T', ' ') + ':00';
+
     const payload = {
       title: taskTitle,
       description: taskDesc,
       priority: taskPriority,
       status: taskStatus,
       assigned_to: assignedTo,
-      deadline: taskDeadline || null
+      deadline: formattedDeadline
     };
 
     try {
@@ -370,7 +380,6 @@ function ProjectDetail() {
           <h1 className="text-2xl font-bold text-gray-800">
             {project ? project.name : "Chi tiết dự án"}
           </h1>
-          {/* Sửa tràn chữ ở phần mô tả bằng break-words break-all */}
           <p className="text-sm text-gray-500 wrap-break-words break-all whitespace-pre-line mt-1">
             {project?.description || "Không có mô tả"}
           </p>
@@ -414,7 +423,6 @@ function ProjectDetail() {
                 {m.role}
               </span>
               
-              {/* Nút ✕ Xóa thành viên (Chỉ hiển thị cho Leader và không tự xóa bản thân) */}
               {isLeader && m.user_id !== currentUserId && (
                 <button
                   onClick={() => handleRemoveMember(m.user_id, m.name || m.email)}
@@ -585,11 +593,14 @@ function ProjectDetail() {
                 )}
               </div>
 
-              {/* Hạn chót */}
+              {/* Hạn chót (Deadline - Bắt buộc nhập & Đã sửa không lệch 7 tiếng) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Hạn chót (Deadline)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Hạn chót (Deadline) <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="datetime-local"
+                  required
                   value={taskDeadline}
                   onChange={(e) => setTaskDeadline(e.target.value)}
                   className="w-full border border-gray-300 px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 text-sm"

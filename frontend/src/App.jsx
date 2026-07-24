@@ -105,7 +105,7 @@ function KanbanBoard() {
         const { task_id, ...taskData } = taskPayload;
         const payloadToSubmit = {
           ...taskData,
-          status: "To Do", 
+          status: taskPayload.status || "To Do", // 👈 ĐÃ SỬA: Lấy trạng thái từ Modal thay vì cố định "To Do"
           project_id: null    
         };
         await axios.post('https://kaban-api-backend-ro81.onrender.com/api/tasks', payloadToSubmit, getAuthConfig());
